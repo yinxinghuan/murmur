@@ -37,6 +37,9 @@ final class AppState {
     var flowBarEnabled: Bool {
         didSet { UserDefaults.standard.set(flowBarEnabled, forKey: "flowBarEnabled") }
     }
+    var flowBarTheme: String {
+        didSet { UserDefaults.standard.set(flowBarTheme, forKey: "flowBarTheme") }
+    }
     var autoPasteEnabled: Bool {
         didSet { UserDefaults.standard.set(autoPasteEnabled, forKey: "autoPasteEnabled") }
     }
@@ -109,6 +112,7 @@ final class AppState {
         llmCleanupEnabled = defaults.object(forKey: "llmCleanupEnabled") as? Bool ?? true
         llmModel = defaults.string(forKey: "llmModel") ?? "qwen2.5:1.5b"
         flowBarEnabled = defaults.object(forKey: "flowBarEnabled") as? Bool ?? true
+        flowBarTheme = defaults.string(forKey: "flowBarTheme") ?? "voiceFirst"
         autoPasteEnabled = defaults.object(forKey: "autoPasteEnabled") as? Bool ?? true
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }

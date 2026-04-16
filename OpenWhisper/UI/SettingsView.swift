@@ -129,6 +129,22 @@ struct SettingsView: View {
                     .controlSize(.small)
             }
 
+            // Theme
+            if appState.flowBarEnabled {
+                HStack {
+                    Label("Theme", systemImage: "paintbrush")
+                    Spacer()
+                    Picker("", selection: $appState.flowBarTheme) {
+                        Text("极简").tag("voiceFirst")
+                        Text("毛玻璃").tag("spatialGlass")
+                        Text("极光").tag("aurora")
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                }
+            }
+
             // Launch at Login
             HStack {
                 Label("Launch at Login", systemImage: "arrow.right.circle")
