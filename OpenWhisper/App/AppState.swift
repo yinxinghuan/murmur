@@ -123,12 +123,8 @@ final class AppState {
         textInjector = TextInjector()
         flowBarController = FlowBarController(appState: self)
 
-        // Show flow bar immediately (always visible like Wispr Flow)
-        if flowBarEnabled {
-            owLog("[OpenWhisper] Showing flow bar...")
-            flowBarController?.show()
-            owLog("[OpenWhisper] Flow bar shown")
-        }
+        // Flow bar starts hidden — only shows during recording/transcribing
+        owLog("[OpenWhisper] Flow bar ready (hidden until recording)")
 
         // Request mic permission
         microphoneGranted = await audioEngine?.requestPermission() ?? false
@@ -207,6 +203,11 @@ final class AppState {
         audioLevel = 0
         lastError = nil
         playSound("Tink", volume: 0.3)
+
+        // Show flow bar when recording starts
+        if flowBarEnabled {
+            flowBarController?.show()
+        }
 
         audioEngine?.startRecording { [weak self] level in
             Task { @MainActor in
@@ -295,6 +296,13 @@ final class AppState {
             }
 
             recordingState = .idle
+
+            // Hide flow bar after a brief delay (let done animation finish)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                if self?.recordingState == .idle {
+                    self?.flowBarController?.hide()
+                }
+            }
         }
     }
 
