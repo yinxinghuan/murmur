@@ -53,6 +53,9 @@ final class AppState {
     var autoPasteEnabled: Bool {
         didSet { UserDefaults.standard.set(autoPasteEnabled, forKey: "autoPasteEnabled") }
     }
+    var voiceCommandsEnabled: Bool {
+        didSet { UserDefaults.standard.set(voiceCommandsEnabled, forKey: "voiceCommandsEnabled") }
+    }
     // "hold" = hold-to-talk, "toggle" = press-to-start, press-to-stop
     var dictationMode: String {
         didSet { UserDefaults.standard.set(dictationMode, forKey: "dictationMode") }
@@ -150,6 +153,7 @@ final class AppState {
         translateToEnglish = defaults.object(forKey: "translateToEnglish") as? Bool ?? false
         chineseVariant = defaults.string(forKey: "chineseVariant") ?? "simplified"
         autoPasteEnabled = defaults.object(forKey: "autoPasteEnabled") as? Bool ?? true
+        voiceCommandsEnabled = defaults.object(forKey: "voiceCommandsEnabled") as? Bool ?? false
         dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         uiLanguage = defaults.string(forKey: "uiLanguage") ?? "zh"
         launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -437,6 +441,31 @@ final class AppState {
                     text = convertChineseVariant(text, to: chineseVariant)
                 }
 
+                // Voice commands — check if text ends with a command
+                if voiceCommandsEnabled {
+                    let (cleanedText, command) = extractVoiceCommand(text)
+                    if let command {
+                        owLog("[Murmur] Voice command: \(command)")
+                        // If there's text before the command, paste it first
+                        if !cleanedText.isEmpty {
+                            lastTranscription = cleanedText
+                            addToHistory(raw: text, cleaned: cleanedText)
+                            if autoPasteEnabled {
+                                textInjector?.pasteText(cleanedText, targetApp: targetApp)
+                            } else {
+                                textInjector?.copyToClipboard(cleanedText)
+                            }
+                            // Small delay before executing command
+                            try? await Task.sleep(nanoseconds: 200_000_000)
+                        }
+                        executeVoiceCommand(command)
+                        playSound("Glass", volume: 0.15)
+                        recordingState = .idle
+                        hideFlowBarAfterDelay()
+                        return
+                    }
+                }
+
                 // Check raw text for reminder intent BEFORE LLM cleanup can alter it
                 let isReminderCommand = ReminderManager.isReminder(text)
 
@@ -561,6 +590,65 @@ final class AppState {
                 installedLLMModels = names
             }
         } catch {}
+    }
+
+    // MARK: - Voice Commands
+
+    enum VoiceCommand: String {
+        case newLine, send, delete, undo, selectAll
+    }
+
+    private let voiceCommands: [(patterns: [String], command: VoiceCommand)] = [
+        (["换行", "new line", "newline"], .newLine),
+        (["发送", "send", "send it"], .send),
+        (["删除", "delete", "delete that"], .delete),
+        (["撤销", "undo"], .undo),
+        (["全选", "select all"], .selectAll),
+    ]
+
+    /// Extract voice command from end of text. Returns (text without command, command if found)
+    private func extractVoiceCommand(_ text: String) -> (String, VoiceCommand?) {
+        let lower = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        for entry in voiceCommands {
+            for pattern in entry.patterns {
+                if lower.hasSuffix(pattern) {
+                    let cleanEnd = text.index(text.endIndex, offsetBy: -pattern.count)
+                    let cleaned = String(text[text.startIndex..<cleanEnd])
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "，,。.、"))
+                    return (cleaned, entry.command)
+                }
+            }
+        }
+        return (text, nil)
+    }
+
+    /// Execute a voice command via simulated keystrokes
+    private func executeVoiceCommand(_ command: VoiceCommand) {
+        switch command {
+        case .newLine:
+            simulateKey(keyCode: 36)  // Return
+        case .send:
+            simulateKey(keyCode: 36)  // Return (sends in most chat apps)
+        case .delete:
+            // Select all + delete (removes last pasted text)
+            simulateKey(keyCode: 51)  // Backspace
+        case .undo:
+            simulateKey(keyCode: 6, flags: .maskCommand)  // Cmd+Z
+        case .selectAll:
+            simulateKey(keyCode: 0, flags: .maskCommand)  // Cmd+A
+        }
+    }
+
+    private func simulateKey(keyCode: CGKeyCode, flags: CGEventFlags = []) {
+        let source = CGEventSource(stateID: .hidSystemState)
+        if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+           let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) {
+            keyDown.flags = flags
+            keyUp.flags = flags
+            keyDown.post(tap: .cghidEventTap)
+            keyUp.post(tap: .cghidEventTap)
+        }
     }
 
     // MARK: - Chinese Variant

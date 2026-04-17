@@ -386,6 +386,32 @@ struct SettingsView: View {
                 .frame(width: 120)
             }
 
+            HStack {
+                Label(zh ? "语音指令" : "Voice Cmd", systemImage: "mic.badge.plus")
+                Spacer()
+                Toggle("", isOn: $appState.voiceCommandsEnabled)
+                    .toggleStyle(.switch).labelsHidden().controlSize(.mini)
+            }
+
+            if appState.voiceCommandsEnabled {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(zh ? "在语音末尾说指令：" : "Say at end of speech:")
+                        .font(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(zh ? "\"换行\" → ↵" : "\"new line\" → ↵").font(.caption2)
+                            Text(zh ? "\"发送\" → ↵" : "\"send\" → ↵").font(.caption2)
+                            Text(zh ? "\"删除\" → ⌫" : "\"delete\" → ⌫").font(.caption2)
+                        }
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(zh ? "\"撤销\" → ⌘Z" : "\"undo\" → ⌘Z").font(.caption2)
+                            Text(zh ? "\"全选\" → ⌘A" : "\"select all\" → ⌘A").font(.caption2)
+                        }
+                    }
+                    .foregroundStyle(.tertiary)
+                }
+            }
+
             // History
             if !appState.transcriptionHistory.isEmpty {
                 Divider()
