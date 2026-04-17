@@ -4,30 +4,118 @@ import Foundation
 final class WhisperTranscriber: @unchecked Sendable {
     private var whisperKit: WhisperKit?
 
-    /// Check if a model is already downloaded locally
-    func isModelDownloaded(name: String) -> Bool {
+    /// Base directory for all models
+    static var modelBaseURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let localModel = appSupport.appendingPathComponent("Murmur/Models/models/argmaxinc/whisperkit-coreml/openai_whisper-\(name)")
-        return FileManager.default.fileExists(atPath: localModel.path)
+        return appSupport.appendingPathComponent("Murmur/Models")
     }
 
-    /// Load a Whisper model by name (e.g., "tiny", "base", "small", "small.en")
+    /// Directory for a specific model
+    static func modelURL(name: String) -> URL {
+        modelBaseURL.appendingPathComponent("models/argmaxinc/whisperkit-coreml/openai_whisper-\(name)")
+    }
+
+    /// Check if a model is fully downloaded (all required files + weights present)
+    func isModelDownloaded(name: String) -> Bool {
+        let localModel = Self.modelURL(name: name)
+        guard FileManager.default.fileExists(atPath: localModel.path) else { return false }
+        let requiredDirs = ["MelSpectrogram.mlmodelc", "AudioEncoder.mlmodelc", "TextDecoder.mlmodelc"]
+        for dir in requiredDirs {
+            let dirPath = localModel.appendingPathComponent(dir)
+            guard FileManager.default.fileExists(atPath: dirPath.path) else { return false }
+            // Check weights file exists (this is what actually fails when download is interrupted)
+            let weightsDir = dirPath.appendingPathComponent("weights")
+            if FileManager.default.fileExists(atPath: weightsDir.path) {
+                let weightBin = weightsDir.appendingPathComponent("weight.bin")
+                if !FileManager.default.fileExists(atPath: weightBin.path) {
+                    return false
+                }
+            }
+            // Also check coremldata.bin (older format)
+            let coremlBin = dirPath.appendingPathComponent("coremldata.bin")
+            let modelMil = dirPath.appendingPathComponent("model.mil")
+            if !FileManager.default.fileExists(atPath: coremlBin.path) &&
+               !FileManager.default.fileExists(atPath: modelMil.path) {
+                return false
+            }
+        }
+        return true
+    }
+
+    /// Delete a downloaded model
+    func deleteModel(name: String) {
+        try? FileManager.default.removeItem(at: Self.modelURL(name: name))
+    }
+
+    /// Clean up incomplete/corrupted model downloads
+    func cleanIncompleteDownloads() {
+        let coremlDir = Self.modelBaseURL.appendingPathComponent("models/argmaxinc/whisperkit-coreml")
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: coremlDir,
+            includingPropertiesForKeys: nil
+        ) else { return }
+
+        let requiredFiles = ["MelSpectrogram.mlmodelc", "AudioEncoder.mlmodelc", "TextDecoder.mlmodelc"]
+        for dir in contents where dir.hasDirectoryPath {
+            let complete = requiredFiles.allSatisfy {
+                FileManager.default.fileExists(atPath: dir.appendingPathComponent($0).path)
+            }
+            if !complete {
+                owLog("[Whisper] Removing incomplete model: \(dir.lastPathComponent)")
+                try? FileManager.default.removeItem(at: dir)
+            }
+        }
+    }
+
+    /// Load a Whisper model by name
     func loadModel(name: String, progress: @escaping @Sendable (Double) -> Void) async throws {
-        // Store models in Application Support (persistent) instead of Caches (macOS purges Caches)
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let modelBase = appSupport.appendingPathComponent("Murmur/Models")
+        let modelBase = Self.modelBaseURL
         try FileManager.default.createDirectory(at: modelBase, withIntermediateDirectories: true)
 
-        // Check if model already exists locally
-        let localModel = modelBase
-            .appendingPathComponent("models/argmaxinc/whisperkit-coreml/openai_whisper-\(name)")
+        // Create README if not exists
+        let readmePath = modelBase.appendingPathComponent("README.txt")
+        if !FileManager.default.fileExists(atPath: readmePath.path) {
+            let readme = """
+            Murmur — Voice Model Directory
+            ==============================
+
+            This folder contains WhisperKit CoreML models used by Murmur.
+            Models are downloaded automatically from HuggingFace (argmaxinc/whisperkit-coreml).
+
+            Supported models:
+              - openai_whisper-tiny       (39 MB)
+              - openai_whisper-base       (140 MB)
+              - openai_whisper-small      (460 MB)
+              - openai_whisper-small.en   (460 MB, English only)
+              - openai_whisper-large-v3_turbo (1.6 GB)
+              - openai_whisper-large-v3   (3 GB)
+
+            To manually add a model, place the complete WhisperKit CoreML model folder
+            (containing MelSpectrogram.mlmodelc, AudioEncoder.mlmodelc, TextDecoder.mlmodelc, etc.)
+            under: models/argmaxinc/whisperkit-coreml/openai_whisper-{name}/
+
+            Models can be downloaded from:
+            https://huggingface.co/argmaxinc/whisperkit-coreml
+
+            Do NOT delete this folder while Murmur is running.
+            """
+            try? readme.write(to: readmePath, atomically: true, encoding: .utf8)
+        }
+
+        let localModel = Self.modelURL(name: name)
         let modelFolder: URL
 
-        if FileManager.default.fileExists(atPath: localModel.path) {
+        if isModelDownloaded(name: name) {
             owLog("[Whisper] Model found locally: openai_whisper-\(name)")
             modelFolder = localModel
             progress(0.8)
         } else {
+            // Clean any partial download first
+            if FileManager.default.fileExists(atPath: localModel.path) {
+                owLog("[Whisper] Removing incomplete model before re-download")
+                try? FileManager.default.removeItem(at: localModel)
+            }
+
             owLog("[Whisper] Downloading model: openai_whisper-\(name)...")
             modelFolder = try await WhisperKit.download(
                 variant: "openai_whisper-\(name)",
@@ -54,7 +142,7 @@ final class WhisperTranscriber: @unchecked Sendable {
         removeOtherModels(keeping: name, in: modelBase)
     }
 
-    /// Transcribe 16kHz mono Float32 audio to text
+    /// Transcribe audio
     func transcribe(audioData: [Float], language: String, translateToEnglish: Bool = false) async throws -> String {
         guard let whisperKit else {
             throw TranscriberError.modelNotLoaded
@@ -73,7 +161,7 @@ final class WhisperTranscriber: @unchecked Sendable {
             supressTokens: nil,
             compressionRatioThreshold: 2.4,
             logProbThreshold: -1.0,
-            noSpeechThreshold: 0.6
+            noSpeechThreshold: 0.8
         )
 
         let results = try await whisperKit.transcribe(
@@ -81,7 +169,6 @@ final class WhisperTranscriber: @unchecked Sendable {
             decodeOptions: options
         )
 
-        // Log detected language from results
         for (i, result) in results.enumerated() {
             owLog("[Whisper] Result[\(i)] language=\(result.language) text=\(result.text)")
         }
@@ -91,9 +178,8 @@ final class WhisperTranscriber: @unchecked Sendable {
             .joined(separator: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Filter out Whisper hallucinations on silence/noise
+        // Filter hallucinations
         let hallucinations: Set<String> = [
-            // English
             "Thank you.", "Thanks for watching.", "Subscribe.",
             "you", "You", ".", "", "...", "Thank you for watching.",
             "Bye.", "Bye bye.", "Bye-bye.", "The end.",
@@ -103,7 +189,6 @@ final class WhisperTranscriber: @unchecked Sendable {
             "Don't forget to subscribe.", "Hit the like button.",
             "See you in the next video.", "See you in the next one.",
             "Please like and subscribe.", "Goodbye.", "Good bye.",
-            // Chinese
             "谢谢大家", "谢谢观看", "谢谢收看", "谢谢",
             "一键三连", "点赞", "订阅", "转发",
             "感谢观看", "感谢收听", "感谢大家",
@@ -112,17 +197,15 @@ final class WhisperTranscriber: @unchecked Sendable {
             "字幕by", "字幕", "潜水艇字幕",
         ]
         if hallucinations.contains(text) { return "" }
-        if text.hasPrefix("[") || text.hasPrefix("(") { return "" }  // [BLANK_AUDIO], (silence), etc.
-        if text.count < 3 { return "" }  // Too short to be meaningful
+        if text.hasPrefix("[") || text.hasPrefix("(") { return "" }
+        if text.count < 3 { return "" }
 
-        // Catch longer hallucination patterns (YouTube outros, subtitle credits, repetitive)
         let hallucinationPatterns = [
-            // Chinese
             "请不吝", "点赞订阅", "打赏支持", "明镜", "点点栏目",
-            "字幕组", "字幕制作", "翻译校对",
+            "字幕组", "字幕制作", "字幕製作", "翻译校对", "翻譯校對",
+            "贝尔", "貝爾", "索尼", "华纳",
             "欢迎订阅", "关注我们", "点击订阅",
             "支持明镜", "请订阅转发",
-            // English
             "subscribe", "like button", "next video",
             "don't forget to", "hit the bell",
             "leave a comment", "share this video",
@@ -132,28 +215,25 @@ final class WhisperTranscriber: @unchecked Sendable {
             if lowerText.contains(pattern.lowercased()) { return "" }
         }
 
-        // Detect repetitive hallucinations (same word/phrase repeated)
         let words = text.components(separatedBy: " ").filter { !$0.isEmpty }
         if words.count >= 4 {
             let unique = Set(words)
-            if unique.count <= 2 { return "" }  // e.g. "you you you you"
+            if unique.count <= 2 { return "" }
         }
 
         return text
     }
 
-    /// Keep only the 2 most recent models on disk, delete the rest
+    /// Keep only the 2 most recent models on disk
     private func removeOtherModels(keeping activeName: String, in modelBase: URL) {
         let fm = FileManager.default
         let activeModel = "openai_whisper-\(activeName)"
         guard let repos = try? fm.contentsOfDirectory(at: modelBase, includingPropertiesForKeys: nil) else { return }
         for repo in repos where repo.hasDirectoryPath {
             guard let variants = try? fm.contentsOfDirectory(
-                at: repo,
-                includingPropertiesForKeys: [.contentModificationDateKey]
+                at: repo, includingPropertiesForKeys: [.contentModificationDateKey]
             ) else { continue }
 
-            // Get all model folders sorted by modification date (newest first)
             let models = variants
                 .filter { $0.hasDirectoryPath && !$0.lastPathComponent.hasPrefix(".") }
                 .sorted {
@@ -162,7 +242,6 @@ final class WhisperTranscriber: @unchecked Sendable {
                     return d1 > d2
                 }
 
-            // Keep the active model + 1 most recent other model (max 2 total)
             var kept = Set<String>()
             kept.insert(activeModel)
             for model in models where kept.count < 2 {

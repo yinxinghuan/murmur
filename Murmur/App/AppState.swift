@@ -43,6 +43,10 @@ final class AppState {
     var translateToEnglish: Bool {
         didSet { UserDefaults.standard.set(translateToEnglish, forKey: "translateToEnglish") }
     }
+    // "auto" = no conversion, "simplified" = 繁→简, "traditional" = 简→繁
+    var chineseVariant: String {
+        didSet { UserDefaults.standard.set(chineseVariant, forKey: "chineseVariant") }
+    }
     var autoPasteEnabled: Bool {
         didSet { UserDefaults.standard.set(autoPasteEnabled, forKey: "autoPasteEnabled") }
     }
@@ -65,6 +69,7 @@ final class AppState {
 
     // MARK: - Runtime State
 
+    var isFirstLaunch: Bool = !UserDefaults.standard.bool(forKey: "hasLaunched")
     var audioLevel: Float = 0.0
     var recordingDuration: TimeInterval = 0.0
     var ollamaAvailable: Bool = false
@@ -120,6 +125,7 @@ final class AppState {
         flowBarEnabled = defaults.object(forKey: "flowBarEnabled") as? Bool ?? true
         flowBarTheme = defaults.string(forKey: "flowBarTheme") ?? "voiceFirst"
         translateToEnglish = defaults.object(forKey: "translateToEnglish") as? Bool ?? false
+        chineseVariant = defaults.string(forKey: "chineseVariant") ?? "simplified"
         autoPasteEnabled = defaults.object(forKey: "autoPasteEnabled") as? Bool ?? true
         uiLanguage = defaults.string(forKey: "uiLanguage") ?? "zh"
         launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -135,7 +141,9 @@ final class AppState {
         textInjector = TextInjector()
         flowBarController = FlowBarController(appState: self)
 
-        // Flow bar starts hidden — only shows during recording/transcribing
+        // Clean up any incomplete model downloads from previous crashes
+        transcriber?.cleanIncompleteDownloads()
+
         owLog("[Murmur] Flow bar ready (hidden until recording)")
 
         // Request mic permission
@@ -172,14 +180,29 @@ final class AppState {
         let notifGranted = await reminderManager?.requestPermission() ?? false
         owLog("[Murmur] Notification permission: \(notifGranted)")
         owLog("[Murmur] Ready!")
+
+        if isFirstLaunch {
+            UserDefaults.standard.set(true, forKey: "hasLaunched")
+        }
     }
+
+    func dismissOnboarding() {
+        isFirstLaunch = false
+    }
+
+    private let modelFallbackOrder = ["large-v3_turbo", "large-v3", "small", "base", "tiny"]
+
+    var failedModelName: String?  // Non-nil when a model failed and needs user action
 
     func loadModel() async {
         modelLoaded = false
         modelLoading = true
         modelLoadProgress = 0
-        modelIsDownloading = !(transcriber?.isModelDownloaded(name: whisperModel) ?? false)
-        owLog("[Murmur] Loading model: \(whisperModel) (download needed: \(modelIsDownloading))...")
+        lastError = nil
+        failedModelName = nil
+        let wasDownloading = !(transcriber?.isModelDownloaded(name: whisperModel) ?? false)
+        modelIsDownloading = wasDownloading
+        owLog("[Murmur] Loading model: \(whisperModel) (download needed: \(wasDownloading))...")
         do {
             try await transcriber?.loadModel(name: whisperModel) { [weak self] progress in
                 Task { @MainActor in
@@ -188,12 +211,76 @@ final class AppState {
             }
             modelLoaded = true
             modelLoading = false
+            lastError = nil
+            refreshDownloadedModels()
             owLog("[Murmur] Model loaded: \(modelLoaded)")
+
+            // Notify user if they're not looking at the menu
+            if wasDownloading {
+                sendNotification(
+                    title: "Murmur",
+                    body: uiLanguage == "zh"
+                        ? "模型 \(whisperModel) 已就绪，可以开始使用"
+                        : "Model \(whisperModel) is ready to use"
+                )
+                playSound("Glass", volume: 0.2)
+            }
         } catch {
-            modelLoading = false
-            lastError = "Failed to load model: \(error.localizedDescription)"
             owLog("[Murmur] Model load failed: \(error)")
+            modelLoading = false
+
+            // Delete the broken model
+            transcriber?.deleteModel(name: whisperModel)
+            refreshDownloadedModels()
+
+            // Don't auto-fallback — let user decide
+            failedModelName = whisperModel
+            lastError = uiLanguage == "zh"
+                ? "\(whisperModel) 下载不完整或已损坏"
+                : "\(whisperModel) is incomplete or corrupted"
         }
+    }
+
+    private func sendNotification(title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    /// Find the largest available downloaded model as fallback
+    func findFallbackModel() -> String? {
+        for name in modelFallbackOrder {
+            if name != whisperModel && (transcriber?.isModelDownloaded(name: name) ?? false) {
+                return name
+            }
+        }
+        return nil
+    }
+
+    /// Retry: delete corrupted model and re-download
+    func retryModelDownload() {
+        transcriber?.deleteModel(name: whisperModel)
+        lastError = nil
+        refreshDownloadedModels()
+        Task { await loadModel() }
+    }
+
+    /// Delete a specific model
+    func deleteWhisperModel(name: String) {
+        transcriber?.deleteModel(name: name)
+        refreshDownloadedModels()
+        if name == whisperModel {
+            modelLoaded = false
+        }
+    }
+
+    /// Open model directory in Finder
+    func openModelDirectory() {
+        let url = WhisperTranscriber.modelBaseURL
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(url)
     }
 
     // MARK: - Recording Flow
@@ -202,6 +289,13 @@ final class AppState {
         guard recordingState == .idle else { return }
         guard modelLoaded else {
             owLog("[Murmur] Cannot record — model not loaded yet")
+            playSound("Basso", volume: 0.3)
+            // Show notification to user
+            let content = UNMutableNotificationContent()
+            content.title = "Murmur"
+            content.body = uiLanguage == "zh" ? "模型未加载，请在设置中选择并下载模型" : "Model not loaded. Please select and download a model in settings."
+            let request = UNNotificationRequest(identifier: "no-model", content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request)
             return
         }
 
@@ -259,6 +353,15 @@ final class AppState {
             return
         }
 
+        // Silent detection: skip if average volume too low
+        let rms = sqrt(audioData.map { $0 * $0 }.reduce(0, +) / Float(audioData.count))
+        if rms < 0.005 {
+            owLog("[Murmur] Audio too quiet (rms=\(rms)), skipping")
+            recordingState = .idle
+            hideFlowBarAfterDelay(0.3)
+            return
+        }
+
         Task {
             do {
                 var text = try await transcriber?.transcribe(
@@ -278,6 +381,11 @@ final class AppState {
                 }
 
                 owLog("[Murmur] Raw: \(text)")
+
+                // Chinese variant conversion (zero-cost, no LLM needed)
+                if (language == "zh" || language == "") && chineseVariant != "auto" {
+                    text = convertChineseVariant(text, to: chineseVariant)
+                }
 
                 // Check raw text for reminder intent BEFORE LLM cleanup can alter it
                 let isReminderCommand = ReminderManager.isReminder(text)
@@ -364,6 +472,18 @@ final class AppState {
                 installedLLMModels = names
             }
         } catch {}
+    }
+
+    // MARK: - Chinese Variant
+
+    private func convertChineseVariant(_ text: String, to variant: String) -> String {
+        let mutable = NSMutableString(string: text)
+        if variant == "simplified" {
+            CFStringTransform(mutable, nil, "Traditional-Simplified" as CFString, false)
+        } else if variant == "traditional" {
+            CFStringTransform(mutable, nil, "Simplified-Traditional" as CFString, false)
+        }
+        return mutable as String
     }
 
     // MARK: - Sound

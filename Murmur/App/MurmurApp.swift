@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import UserNotifications
 
 func owLog(_ msg: String) {
@@ -13,6 +14,34 @@ func owLog(_ msg: String) {
     }
 }
 
+private func loadMenuBarIcon() -> NSImage {
+    // Try resource bundle first (SPM puts processed resources here)
+    if let url = Bundle.module.url(forResource: "menubar_icon", withExtension: "png"),
+       let img = NSImage(contentsOf: url) {
+        img.isTemplate = true
+        img.size = NSSize(width: 18, height: 18)
+        return img
+    }
+    // Fallback: create programmatically
+    let size = NSSize(width: 18, height: 18)
+    let img = NSImage(size: size, flipped: false) { rect in
+        let bars: [(CGFloat, CGFloat)] = [(5, 5), (9, 9), (13, 13), (9, 9), (5, 5)]
+        let barW: CGFloat = 2
+        let gap: CGFloat = 2
+        let totalW = CGFloat(bars.count) * barW + CGFloat(bars.count - 1) * gap
+        let startX = (rect.width - totalW) / 2
+        NSColor.black.setFill()
+        for (i, (_, h)) in bars.enumerated() {
+            let x = startX + CGFloat(i) * (barW + gap)
+            let y = (rect.height - h) / 2
+            NSBezierPath(roundedRect: NSRect(x: x, y: y, width: barW, height: h), xRadius: 1, yRadius: 1).fill()
+        }
+        return true
+    }
+    img.isTemplate = true
+    return img
+}
+
 @main
 struct MurmurApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -22,7 +51,7 @@ struct MurmurApp: App {
             SettingsView()
                 .environment(AppState.shared)
         } label: {
-            Image(systemName: AppState.shared.recordingState == .recording ? "waveform.circle.fill" : "waveform")
+            Image(nsImage: loadMenuBarIcon())
         }
         .menuBarExtraStyle(.window)
     }
