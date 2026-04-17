@@ -246,10 +246,10 @@ struct SettingsView: View {
                 }
             }
 
-            // Chinese variant (only show when language is Chinese)
-            if appState.language == "zh" || appState.language == "" {
+            // Chinese variant (only show when Chinese input + not translating to English)
+            if (appState.language == "zh" || appState.language == "") && !appState.translateToEnglish {
                 HStack {
-                    Label(zh ? "中文字体" : "Chinese", systemImage: "character")
+                    Label(zh ? "中文格式" : "Chinese", systemImage: "character")
                     Spacer()
                     Picker("", selection: $appState.chineseVariant) {
                         Text(zh ? "简体" : "简").tag("simplified")
