@@ -4,6 +4,8 @@ struct SettingsView: View {
     @Environment(AppState.self) var appState
 
     private var zh: Bool { appState.uiLanguage == "zh" }
+    private let rightColWidth: CGFloat = 200
+    @State private var showAdvanced = false
 
     var body: some View {
         @Bindable var appState = appState
@@ -137,19 +139,11 @@ struct SettingsView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .id(appState.downloadedWhisperModels)  // Force Picker refresh when download state changes
+                .frame(width: rightColWidth, alignment: .trailing)
+                .id(appState.downloadedWhisperModels)
                 .onChange(of: appState.whisperModel) {
                     Task { await appState.loadModel() }
                 }
-                // Open model folder button
-                Button(action: { appState.openModelDirectory() }) {
-                    Image(systemName: "folder")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help(zh ? "打开模型目录" : "Open model folder")
             }
 
             // Model status
@@ -228,10 +222,52 @@ struct SettingsView: View {
                     Text("Bahasa").tag("id")
                 }
                 .labelsHidden()
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                .frame(width: rightColWidth, alignment: .trailing)
             }
 
-            // Only show translation option when input language is not English
+            // Hotkey + Mode (basic — user needs to know)
+            HStack {
+                Label(zh ? "快捷键" : "Hotkey", systemImage: "command")
+                Spacer()
+                Text("Right ⌥")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor))
+                    .frame(width: rightColWidth, alignment: .trailing)
+            }
+
+            HStack {
+                Label(zh ? "录音方式" : "Mode", systemImage: "hand.tap")
+                Spacer()
+                Picker("", selection: $appState.dictationMode) {
+                    Text(zh ? "按住" : "Hold").tag("hold")
+                    Text(zh ? "切换" : "Toggle").tag("toggle")
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: rightColWidth, alignment: .trailing)
+            }
+
+            Divider()
+
+            // ━━━ Advanced Section ━━━
+            HStack {
+                Text(zh ? "更多设置" : "More Settings")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showAdvanced.toggle() } }) {
+                    Image(systemName: showAdvanced ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if showAdvanced {
+
             if appState.language != "en" && appState.whisperModel != "small.en" {
                 HStack {
                     Label(zh ? "输出" : "Output", systemImage: "character.bubble")
@@ -242,11 +278,10 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .frame(width: rightColWidth, alignment: .trailing)
                 }
             }
 
-            // Chinese variant (only show when Chinese input + not translating to English)
             if (appState.language == "zh" || appState.language == "") && !appState.translateToEnglish {
                 HStack {
                     Label(zh ? "中文格式" : "Chinese", systemImage: "character")
@@ -258,7 +293,7 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 150)
+                    .frame(width: rightColWidth, alignment: .trailing)
                 }
             }
 
@@ -268,15 +303,18 @@ struct SettingsView: View {
             HStack {
                 Label(zh ? "文本润色" : "Text polish", systemImage: "sparkle")
                 Spacer()
-                if appState.llmCleanupEnabled {
-                    Text(appState.ollamaAvailable
-                         ? (zh ? "已连接" : "Connected")
-                         : (zh ? "未连接" : "Offline"))
-                        .font(.caption2)
-                        .foregroundStyle(appState.ollamaAvailable ? Color.secondary : Color.orange)
+                HStack(spacing: 6) {
+                    if appState.llmCleanupEnabled {
+                        Text(appState.ollamaAvailable
+                             ? (zh ? "已连接" : "Connected")
+                             : (zh ? "未连接" : "Offline"))
+                            .font(.caption2)
+                            .foregroundStyle(appState.ollamaAvailable ? Color.secondary : Color.orange)
+                    }
+                    Toggle("", isOn: $appState.llmCleanupEnabled)
+                        .toggleStyle(.switch).labelsHidden().controlSize(.mini)
                 }
-                Toggle("", isOn: $appState.llmCleanupEnabled)
-                    .toggleStyle(.switch).labelsHidden().controlSize(.mini)
+                .frame(width: rightColWidth, alignment: .trailing)
             }
 
             if appState.llmCleanupEnabled {
@@ -303,7 +341,7 @@ struct SettingsView: View {
                         llmModelLabel("gemma4:e4b (9.6 GB)", name: "gemma4:e4b")
                     }
                     .labelsHidden()
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .frame(width: rightColWidth, alignment: .trailing)
                 }
 
                 // Protected terms
@@ -326,22 +364,25 @@ struct SettingsView: View {
                 Spacer()
                 Toggle("", isOn: $appState.autoPasteEnabled)
                     .toggleStyle(.switch).labelsHidden().controlSize(.mini)
+                    .frame(width: rightColWidth, alignment: .trailing)
             }
 
             HStack {
                 Label(zh ? "悬浮条" : "Flow Bar", systemImage: "capsule")
                 Spacer()
-                if appState.flowBarEnabled {
-                    Picker("", selection: $appState.flowBarTheme) {
-                        Text(zh ? "黑底" : "Dark").tag("voiceFirst")
-                        Text(zh ? "白底" : "Light").tag("invert")
+                HStack(spacing: 6) {
+                    if appState.flowBarEnabled {
+                        Picker("", selection: $appState.flowBarTheme) {
+                            Text(zh ? "黑底" : "Dark").tag("voiceFirst")
+                            Text(zh ? "白底" : "Light").tag("invert")
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
                     }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 100)
+                    Toggle("", isOn: $appState.flowBarEnabled)
+                        .toggleStyle(.switch).labelsHidden().controlSize(.mini)
                 }
-                Toggle("", isOn: $appState.flowBarEnabled)
-                    .toggleStyle(.switch).labelsHidden().controlSize(.mini)
+                .frame(width: rightColWidth, alignment: .trailing)
             }
 
             HStack {
@@ -349,6 +390,7 @@ struct SettingsView: View {
                 Spacer()
                 Toggle("", isOn: $appState.launchAtLogin)
                     .toggleStyle(.switch).labelsHidden().controlSize(.mini)
+                    .frame(width: rightColWidth, alignment: .trailing)
             }
 
             HStack {
@@ -360,30 +402,7 @@ struct SettingsView: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(width: 100)
-            }
-
-            HStack {
-                Label(zh ? "快捷键" : "Hotkey", systemImage: "command")
-                Spacer()
-                Text("Right ⌥")
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor))
-            }
-
-            HStack {
-                Label(zh ? "录音方式" : "Mode", systemImage: "hand.tap")
-                Spacer()
-                Picker("", selection: $appState.dictationMode) {
-                    Text(zh ? "按住" : "Hold").tag("hold")
-                    Text(zh ? "切换" : "Toggle").tag("toggle")
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 120)
+                .frame(width: rightColWidth, alignment: .trailing)
             }
 
             HStack {
@@ -391,6 +410,7 @@ struct SettingsView: View {
                 Spacer()
                 Toggle("", isOn: $appState.voiceCommandsEnabled)
                     .toggleStyle(.switch).labelsHidden().controlSize(.mini)
+                    .frame(width: rightColWidth, alignment: .trailing)
             }
 
             if appState.voiceCommandsEnabled {
@@ -411,6 +431,8 @@ struct SettingsView: View {
                     .foregroundStyle(.tertiary)
                 }
             }
+
+            } // end if showAdvanced
 
             // History
             if !appState.transcriptionHistory.isEmpty {
