@@ -44,22 +44,7 @@ final class TextInjector: @unchecked Sendable {
             owLog("[TextInjector] Posting CGEvent Cmd+V...")
             self.simulateCmdV()
 
-            // Method 2: After a short delay, also try AXUIElement for apps where CGEvent fails
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                // Check if clipboard still has our text (if it does, paste probably didn't work)
-                let clipText = NSPasteboard.general.string(forType: .string)
-                if clipText == cleaned {
-                    owLog("[TextInjector] Paste may have failed — text still in clipboard")
-                    // Notify user: text is in clipboard, press ⌘V to paste manually
-                    let content = UNMutableNotificationContent()
-                    content.title = "Murmur"
-                    content.body = "自动粘贴失败，文字已复制到剪贴板，请按 ⌘V 手动粘贴"
-                    let request = UNNotificationRequest(identifier: "paste-failed", content: content, trigger: nil)
-                    UNUserNotificationCenter.current().add(request)
-                } else {
-                    owLog("[TextInjector] Paste likely worked")
-                }
-            }
+            // Text is always in clipboard as backup — user can ⌘V if auto-paste didn't work
         }
     }
 
