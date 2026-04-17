@@ -82,6 +82,21 @@ final class AppState {
     var modelIsDownloading: Bool = false
     var lastTranscription: String = ""
     var lastError: String?
+    var transcriptionHistory: [TranscriptionRecord] = []
+
+    struct TranscriptionRecord: Identifiable, Codable {
+        let id: UUID
+        let raw: String
+        let cleaned: String
+        let date: Date
+
+        init(raw: String, cleaned: String) {
+            self.id = UUID()
+            self.raw = raw
+            self.cleaned = cleaned
+            self.date = Date()
+        }
+    }
     var accessibilityGranted: Bool = false
     var microphoneGranted: Bool = false
     var downloadedWhisperModels: Set<String> = []
@@ -148,6 +163,7 @@ final class AppState {
         // Clean up any incomplete model downloads from previous crashes
         transcriber?.cleanIncompleteDownloads()
 
+        loadHistory()
         owLog("[Murmur] Flow bar ready (hidden until recording)")
 
         // Request mic permission
@@ -403,6 +419,7 @@ final class AppState {
                         owLog("[Murmur] Cannot set reminder — Ollama not available")
                     }
                 } else {
+                    let rawText = text
                     if llmCleanupEnabled && ollamaAvailable {
                         let terms = customTerms.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
                         text = await llmCleanup?.cleanup(text: text, model: llmModel, protectedTerms: terms) ?? text
@@ -410,6 +427,7 @@ final class AppState {
                     }
 
                     lastTranscription = text
+                    addToHistory(raw: rawText, cleaned: text)
 
                     if autoPasteEnabled {
                         textInjector?.pasteText(text, targetApp: targetApp)
@@ -426,6 +444,42 @@ final class AppState {
 
             recordingState = .idle
             hideFlowBarAfterDelay()
+        }
+    }
+
+    // MARK: - Transcription History
+
+    private static let maxHistory = 20
+
+    func addToHistory(raw: String, cleaned: String) {
+        let record = TranscriptionRecord(raw: raw, cleaned: cleaned)
+        transcriptionHistory.insert(record, at: 0)
+        if transcriptionHistory.count > Self.maxHistory {
+            transcriptionHistory = Array(transcriptionHistory.prefix(Self.maxHistory))
+        }
+        saveHistory()
+    }
+
+    func clearHistory() {
+        transcriptionHistory = []
+        saveHistory()
+    }
+
+    func copyHistoryItem(_ record: TranscriptionRecord) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(record.cleaned, forType: .string)
+    }
+
+    private func saveHistory() {
+        if let data = try? JSONEncoder().encode(transcriptionHistory) {
+            UserDefaults.standard.set(data, forKey: "transcriptionHistory")
+        }
+    }
+
+    func loadHistory() {
+        if let data = UserDefaults.standard.data(forKey: "transcriptionHistory"),
+           let history = try? JSONDecoder().decode([TranscriptionRecord].self, from: data) {
+            transcriptionHistory = history
         }
     }
 

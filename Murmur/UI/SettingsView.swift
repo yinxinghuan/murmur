@@ -374,6 +374,49 @@ struct SettingsView: View {
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor))
             }
 
+            // History
+            if !appState.transcriptionHistory.isEmpty {
+                Divider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Label(zh ? "转写历史" : "History", systemImage: "clock")
+                        Spacer()
+                        Button(zh ? "清除" : "Clear") {
+                            appState.clearHistory()
+                        }
+                        .buttonStyle(.plain)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
+                    ForEach(appState.transcriptionHistory.prefix(5)) { record in
+                        HStack(spacing: 6) {
+                            Text(record.cleaned)
+                                .font(.system(size: 11))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                            Spacer()
+                            Text(formatHistoryTime(record.date))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .fixedSize()
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            appState.copyHistoryItem(record)
+                            playSound("Tink", volume: 0.2)
+                        }
+                        .help(zh ? "点击复制" : "Click to copy")
+                    }
+
+                    if appState.transcriptionHistory.count > 5 {
+                        Text(zh ? "共 \(appState.transcriptionHistory.count) 条" : "\(appState.transcriptionHistory.count) total")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
+            }
+
             Divider()
 
             // Quit — same style as other rows
@@ -474,6 +517,20 @@ struct SettingsView: View {
     private func llmModelLabel(_ label: String, name: String) -> some View {
         let installed = appState.installedLLMModels.contains(name)
         return Text("\(label)\(installed ? "" : " ⤓")").tag(name)
+    }
+
+    private func formatHistoryTime(_ date: Date) -> String {
+        let interval = Date().timeIntervalSince(date)
+        if interval < 60 { return zh ? "刚刚" : "now" }
+        if interval < 3600 { return "\(Int(interval / 60))m" }
+        if interval < 86400 { return "\(Int(interval / 3600))h" }
+        return "\(Int(interval / 86400))d"
+    }
+
+    private func playSound(_ name: String, volume: Float) {
+        guard let sound = NSSound(named: NSSound.Name(name)) else { return }
+        sound.volume = volume
+        sound.play()
     }
 
     private func openSystemSettings(_ url: String) {
