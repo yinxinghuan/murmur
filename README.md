@@ -6,55 +6,30 @@
 
 # Murmur (English)
 
-**Local voice-to-text for macOS** — Hold a key, speak, release. Text appears at your cursor. 100% offline, free and open source.
+**Voice-to-text for macOS, built for talking to AI.**
 
-Built on [WhisperKit](https://github.com/argmaxinc/WhisperKit) (OpenAI Whisper optimized for Apple Silicon). All speech recognition runs locally — no data ever leaves your Mac.
+Hold a key, speak, release — text appears at your cursor. 100% local, 100% free.
+
+## Why Murmur
+
+- **Talk to AI, don't type** — Speak naturally to Claude, ChatGPT, Cursor, or any app. Voice is faster than typing for prompts, code reviews, and brainstorming.
+- **100% offline** — Powered by [WhisperKit](https://github.com/argmaxinc/WhisperKit) on Apple Silicon. Your voice never leaves your Mac. No cloud, no subscription.
+- **Smart text polish** — Optional local LLM (Ollama) fixes punctuation, removes filler words, and preserves your code terms exactly as-is.
+- **Two modes** — Hold-to-talk for quick input. Toggle mode for long conversations with AI.
+- **Voice commands** — Say "send", "new line", "delete" at the end of your speech. Hands-free AI interaction.
 
 ## Features
 
-- **Hold to speak** — Hold Right ⌥ (Option), speak, release. Text auto-pastes at cursor
-- **100% local** — No internet required. Your voice never leaves your Mac
-- **Chinese optimized** — Default Chinese, large-v3 model support, auto Traditional/Simplified conversion
-- **Text polish** — Optional local LLM (Ollama) fixes punctuation and removes filler words
-- **Translation mode** — Speak Chinese, output English (built-in Whisper translation)
-- **29 languages** — Chinese, English, Japanese, Korean, French, German, and more
-- **Dark/Light theme** — Floating recording bar with two high-contrast themes
-- **Bilingual UI** — Settings panel in Chinese and English
-- **Lightweight** — 6MB app, <100MB RAM when idle
-
-## Improvements over OpenWhisper
-
-Murmur is forked from [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app) with extensive improvements:
-
-### Models & Recognition
-- Added Large v3 / Large v3 Turbo model support for significantly better Chinese recognition
-- Smart model recommendation based on system RAM
-- Deep model integrity verification, auto-cleanup of interrupted downloads
-- Clear "Re-download" and "Use another model" options on load failure
-- System notification when model download completes
-- Traditional/Simplified Chinese auto-conversion
-- Expanded hallucination filter (Chinese + English YouTube outros, subtitle credits)
-- Silent audio detection — skips Whisper entirely when no speech detected
-
-### LLM Text Polish
-- LLM model selectable in settings (no longer hardcoded)
-- Chinese-optimized prompt — Simplified punctuation, mixed-language preservation
-- Ollama connection status refreshed on each panel open
-
-### Interaction & UI
-- Redesigned FlowBar — Dark/Light high-contrast themes, hidden when idle
-- First-launch onboarding — 3-step guide: usage → permissions → model
-- Translation mode — Original/English output toggle
-- Sound feedback — subtle audio cues for start/stop/done/error
-- Bilingual settings (Chinese/English), one-click switch
-- Accent color follows system preference
-- Custom app icon
-
-### Reliability
-- Native ARM64 build — optimal CoreML performance
-- Tuned noSpeechThreshold to reduce blank-audio hallucinations
-- Auto-cleanup of incomplete model downloads on startup
-- README file in model directory for manual model management
+- **Hold or Toggle** — Hold Right ⌥ for quick input, or press once to start / press again to stop
+- **6 Whisper models** — From Tiny (39 MB) to Large v3 (3 GB), auto-recommended for your Mac
+- **Chinese optimized** — Simplified/Traditional auto-conversion, Chinese hallucination filtering
+- **Translation** — Speak Chinese, output English
+- **Text polish** — Local LLM removes "um", "uh", fixes grammar, preserves code terms
+- **Voice commands** — "new line", "send", "delete", "undo", "select all"
+- **Transcription history** — Last 20 records, tap to copy
+- **Smart model management** — Integrity checks, auto-retry, download notifications
+- **29 languages** — Chinese, English, Japanese, Korean, and more
+- **Lightweight** — 6 MB app, <100 MB RAM when idle
 
 ## Install
 
@@ -75,11 +50,10 @@ cp -R build/Murmur.app /Applications/
 
 ## Getting Started
 
-1. Launch Murmur — it's in the menu bar, no Dock icon
-2. Grant **Microphone** permission when prompted
-3. Grant **Accessibility** permission (System Settings → Privacy & Security → Accessibility)
-4. Wait for model download to complete (~460MB for default model)
-5. **Hold Right ⌥ to speak, release to paste**
+1. Launch Murmur — it lives in your **menu bar**
+2. Grant **Microphone** and **Accessibility** permissions
+3. Wait for model download (~460 MB)
+4. **Hold Right ⌥ to speak, release to paste**
 
 ## Voice Models
 
@@ -91,27 +65,25 @@ cp -R build/Murmur.app /Applications/
 | Large v3 Turbo | 1.6 GB | ★★★ | ★★★★ |
 | Large v3 | 3 GB | ★★ | ★★★★★ |
 
-The app auto-recommends the best model based on your Mac's RAM.
+Auto-recommended based on your Mac's RAM.
 
 ## Text Polish (Optional)
 
-Install [Ollama](https://ollama.com) and pull a model:
-
 ```bash
+brew install ollama
 ollama pull qwen2.5:1.5b
 ```
 
-Murmur auto-detects Ollama. Enable "Text polish" in settings.
+Enable "Text polish" in settings. Murmur auto-detects Ollama.
 
 ## Requirements
 
 - macOS 14.0 (Sonoma) or later
 - Apple Silicon (M1/M2/M3/M4)
-- Xcode (only for building from source)
 
 ## Credits
 
-Forked from [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app) by Rajvardhman05 (MIT License). Thanks for the excellent foundation.
+Forked from [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app) by Rajvardhman05 (MIT License).
 
 ## License
 
@@ -121,61 +93,36 @@ MIT
 
 # Murmur (中文)
 
-**macOS 本地语音转文字** — 按住说话，松开出字。100% 离线，免费开源。
+**macOS 语音转文字，专为与 AI 对话打造。**
 
-基于 [WhisperKit](https://github.com/argmaxinc/WhisperKit)（OpenAI Whisper 的 Apple Silicon 优化版），所有语音识别在本地完成，不上传任何数据。
+按住说话，松开出字，文字自动粘贴到光标处。100% 本地运行，完全免费。
+
+## 为什么选择 Murmur
+
+- **用声音和 AI 对话** — 对 Claude、ChatGPT、Cursor 或任何应用说话。语音比打字更快，适合写 prompt、review 代码、头脑风暴。
+- **100% 离线** — 基于 [WhisperKit](https://github.com/argmaxinc/WhisperKit)，在 Apple Silicon 上本地运行。语音不上传，无需订阅。
+- **智能文本润色** — 可选本地 LLM（Ollama）自动修正标点、去除口语填充词，同时保护你的代码术语不被修改。
+- **两种录音模式** — 按住模式适合快速输入，切换模式适合和 AI 长对话。
+- **语音指令** — 说"发送""换行""删除"，无需触碰键盘。
 
 ## 功能
 
-- **按住说话** — 按住右 ⌥（Option），说话，松开，文字自动粘贴到光标处
-- **100% 本地** — 无需网络，语音不离开你的电脑
-- **中文优化** — 默认中文，支持 large-v3 模型，繁简自动转换
-- **文本润色** — 可选本地 LLM（Ollama）自动修正标点、去除口语填充词
-- **翻译模式** — 说中文，直接输出英文（Whisper 内置翻译）
-- **29 种语言** — 中文、英文、日文、韩文、法文、德文等
-- **黑白主题** — 悬浮录音条支持黑底/白底两种风格
-- **中英双语界面** — 设置面板支持中文和英文切换
-- **轻量** — 应用仅 6MB，空闲时 <100MB 内存
-
-## 相较原版的改进
-
-Murmur fork 自 [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app)，在其基础上做了大量改进：
-
-### 模型与识别
-- 新增 Large v3 / Large v3 Turbo 模型支持，中文识别质量大幅提升
-- 智能模型推荐 — 根据系统内存自动推荐最适合的模型
-- 模型完整性深度校验，自动清理下载中断的损坏文件
-- 模型加载失败时提供"重新下载"和"切换模型"选择
-- 模型下载完成后发送系统通知
-- 繁简中文自动转换（简体/繁体/不转换三选一）
-- 中英文幻觉过滤词库大幅扩充
-- 静音检测 — 无声录音直接跳过，减少幻觉
-
-### LLM 文本润色
-- LLM 模型可在设置中选择，不再硬编码
-- 中文优化 Prompt — 简体标点、中英混合保留、去除中文口语填充词
-- Ollama 状态实时检测，每次打开面板刷新连接状态
-
-### 交互与界面
-- 全新 FlowBar — 黑底/白底两种高对比度主题，空闲时隐藏
-- 首次启动三步引导 — 操作说明 → 权限授予 → 模型下载
-- 翻译模式 — 输出选项支持原文/译为英文
-- 声音反馈 — 开始/停止/完成/错误各有低音量提示音
-- 中英双语设置界面，一键切换
-- 焦点色跟随系统强调色
-- 自定义 App 图标
-
-### 可靠性
-- ARM64 原生构建，CoreML 性能最优
-- noSpeechThreshold 调优，减少空音频幻觉
-- 启动时自动清理不完整的模型下载
-- 模型目录内置 README 说明文件
+- **按住或切换** — 按住右 ⌥ 快速输入，或按一次开始、再按一次停止
+- **6 种 Whisper 模型** — 从 Tiny（39 MB）到 Large v3（3 GB），根据内存自动推荐
+- **中文优化** — 繁简自动转换、中文幻觉过滤、中文标点修正
+- **翻译模式** — 说中文，输出英文
+- **文本润色** — 本地 LLM 去除"嗯""啊"，修正语法，保护代码术语
+- **语音指令** — "换行""发送""删除""撤销""全选"
+- **转写历史** — 最近 20 条记录，点击复制
+- **智能模型管理** — 完整性校验、失败重试、下载完成通知
+- **29 种语言** — 中文、英文、日文、韩文等
+- **轻量** — 应用仅 6 MB，空闲时 <100 MB 内存
 
 ## 安装
 
 ### 下载安装（推荐）
 
-从 [Releases](https://github.com/yinxinghuan/murmur/releases) 下载最新 `.dmg`，打开后将 Murmur 拖入 Applications。
+从 [Releases](https://github.com/yinxinghuan/murmur/releases) 下载最新 `.dmg`，拖入 Applications。
 
 ### 从源码编译
 
@@ -190,11 +137,10 @@ cp -R build/Murmur.app /Applications/
 
 ## 首次使用
 
-1. 启动 Murmur — 它在菜单栏，没有 Dock 图标
-2. 授予**麦克风**权限（弹窗提示）
-3. 授予**辅助功能**权限（系统设置 → 隐私与安全性 → 辅助功能）
-4. 等待模型下载完成（首次约 460MB）
-5. **按住右 ⌥ 说话，松开即可**
+1. 启动 Murmur — 在菜单栏，没有 Dock 图标
+2. 授予**麦克风**和**辅助功能**权限
+3. 等待模型下载（约 460 MB）
+4. **按住右 ⌥ 说话，松开即可**
 
 ## 语音模型
 
@@ -206,29 +152,26 @@ cp -R build/Murmur.app /Applications/
 | Large v3 Turbo | 1.6 GB | ★★★ | ★★★★ |
 | Large v3 | 3 GB | ★★ | ★★★★★ |
 
-系统根据你的 Mac 内存自动推荐最适合的模型。
+根据 Mac 内存自动推荐。
 
 ## 文本润色（可选）
 
-安装 [Ollama](https://ollama.com) 后拉取模型：
-
 ```bash
+brew install ollama
 ollama pull qwen2.5:1.5b
 ```
 
-Murmur 会自动检测 Ollama，在设置中开启"文本润色"即可。
+在设置中开启"文本润色"，Murmur 会自动检测 Ollama。
 
 ## 系统要求
 
 - macOS 14.0（Sonoma）或更高
 - Apple Silicon（M1/M2/M3/M4）
-- Xcode（仅从源码编译时需要）
 
 ## 致谢
 
-Fork 自 [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app) by Rajvardhman05（MIT License）。感谢原作者提供了优秀的基础框架。
+Fork 自 [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app) by Rajvardhman05（MIT License）。
 
 ## License
 
 MIT
-
