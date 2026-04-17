@@ -28,6 +28,9 @@ struct FlowBarView: View {
 struct MinimalFlowBar: View {
     @Environment(AppState.self) var appState
     @State private var showDone = false
+    @State private var stopPulse = false
+
+    private var isToggleMode: Bool { appState.dictationMode == "toggle" }
 
     private var state: BarState {
         if showDone { return .done }
@@ -42,6 +45,13 @@ struct MinimalFlowBar: View {
         ZStack {
             // Recording
             HStack(spacing: 10) {
+                // Toggle mode: show stop indicator
+                if isToggleMode {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(.red)
+                        .frame(width: 10, height: 10)
+                        .opacity(stopPulse ? 1.0 : 0.5)
+                }
                 AudioBars(level: appState.audioLevel, barWidth: 3, barMaxH: 16)
                 Text(fmtTime(appState.recordingDuration))
                     .font(.system(size: 13, weight: .medium, design: .monospaced))
@@ -65,6 +75,11 @@ struct MinimalFlowBar: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 9)
         .background(Capsule().fill(.black))
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                stopPulse = true
+            }
+        }
         .onChange(of: appState.recordingState) { old, new in
             if old == .transcribing && new == .idle {
                 showDone = true
@@ -148,6 +163,9 @@ struct OutlineFlowBar: View {
 struct InvertFlowBar: View {
     @Environment(AppState.self) var appState
     @State private var showDone = false
+    @State private var stopPulse = false
+
+    private var isToggleMode: Bool { appState.dictationMode == "toggle" }
 
     private var state: BarState {
         if showDone { return .done }
@@ -161,6 +179,12 @@ struct InvertFlowBar: View {
     var body: some View {
         ZStack {
             HStack(spacing: 10) {
+                if isToggleMode {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(.red)
+                        .frame(width: 10, height: 10)
+                        .opacity(stopPulse ? 1.0 : 0.5)
+                }
                 AudioBars(level: appState.audioLevel, color: .black, barWidth: 3, barMaxH: 16)
                 Text(fmtTime(appState.recordingDuration))
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
@@ -195,6 +219,11 @@ struct InvertFlowBar: View {
             }
         }
         .animation(.easeInOut(duration: 0.15), value: state)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                stopPulse = true
+            }
+        }
     }
 }
 
