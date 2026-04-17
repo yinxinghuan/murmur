@@ -3,17 +3,28 @@ import Foundation
 final class LLMCleanup: Sendable {
     private let baseURL = "http://localhost:11434"
 
-    private let cleanupPrompt = """
+    private let basePrompt = """
         Fix this voice dictation transcript. Rules:
         - Remove filler words (um, uh, like, you know, so, basically, actually, I mean, 嗯, 啊, 那个, 就是, 然后)
         - Fix grammar, spelling, and punctuation
         - Keep the EXACT meaning and tone — do NOT rephrase or add words
         - If it's code-related, preserve technical terms, variable names, function names exactly
-        - For Chinese text: ALWAYS convert to Simplified Chinese (简体中文), fix punctuation (use 。，！？ etc.), do NOT translate to English
+        - For Chinese text: fix punctuation (use 。，！？ etc.), do NOT translate to English
         - For mixed Chinese-English text: keep each part in its original language
         - Output ONLY the cleaned text, nothing else
         - Do NOT add quotes around the output
         """
+
+    /// Build the full prompt, injecting protected terms if any
+    private func buildPrompt(protectedTerms: [String]) -> String {
+        if protectedTerms.isEmpty { return basePrompt }
+        let termList = protectedTerms.joined(separator: ", ")
+        return basePrompt + """
+
+        CRITICAL — The following terms MUST be preserved exactly as-is (do NOT translate, correct spelling, or modify them in any way):
+        \(termList)
+        """
+    }
 
     /// Check if Ollama is running and responsive
     static func checkAvailability() async -> Bool {
@@ -30,7 +41,7 @@ final class LLMCleanup: Sendable {
     }
 
     /// Clean up transcribed text using local Ollama LLM
-    func cleanup(text: String, model: String = "qwen2.5:1.5b") async -> String {
+    func cleanup(text: String, model: String = "qwen2.5:1.5b", protectedTerms: [String] = []) async -> String {
         guard let url = URL(string: "\(baseURL)/api/generate") else { return text }
 
         var request = URLRequest(url: url)
@@ -38,9 +49,10 @@ final class LLMCleanup: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 30
 
+        let prompt = buildPrompt(protectedTerms: protectedTerms)
         let body: [String: Any] = [
             "model": model,
-            "prompt": "\(cleanupPrompt)\n\nTranscript: \(text)",
+            "prompt": "\(prompt)\n\nTranscript: \(text)",
             "stream": false,
             "options": [
                 "temperature": 0.1,

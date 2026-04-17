@@ -305,6 +305,18 @@ struct SettingsView: View {
                     .labelsHidden()
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 }
+
+                // Protected terms
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(zh ? "保护术语（逗号分隔）" : "Protected terms (comma separated)")
+                        .font(.caption).foregroundStyle(.secondary)
+                    TextField(
+                        zh ? "如: useState, API, onClick" : "e.g. useState, API, onClick",
+                        text: $appState.customTerms
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+                }
             }
 
             Divider()

@@ -31,6 +31,9 @@ final class AppState {
     var llmCleanupEnabled: Bool {
         didSet { UserDefaults.standard.set(llmCleanupEnabled, forKey: "llmCleanupEnabled") }
     }
+    var customTerms: String {
+        didSet { UserDefaults.standard.set(customTerms, forKey: "customTerms") }
+    }
     var llmModel: String {
         didSet { UserDefaults.standard.set(llmModel, forKey: "llmModel") }
     }
@@ -121,6 +124,7 @@ final class AppState {
         whisperModel = defaults.string(forKey: "whisperModel") ?? "small"
         language = defaults.string(forKey: "language") ?? "zh"
         llmCleanupEnabled = defaults.object(forKey: "llmCleanupEnabled") as? Bool ?? true
+        customTerms = defaults.string(forKey: "customTerms") ?? ""
         llmModel = defaults.string(forKey: "llmModel") ?? "qwen2.5:1.5b"
         flowBarEnabled = defaults.object(forKey: "flowBarEnabled") as? Bool ?? true
         flowBarTheme = defaults.string(forKey: "flowBarTheme") ?? "voiceFirst"
@@ -400,7 +404,8 @@ final class AppState {
                     }
                 } else {
                     if llmCleanupEnabled && ollamaAvailable {
-                        text = await llmCleanup?.cleanup(text: text, model: llmModel) ?? text
+                        let terms = customTerms.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                        text = await llmCleanup?.cleanup(text: text, model: llmModel, protectedTerms: terms) ?? text
                         owLog("[Murmur] Cleaned: \(text)")
                     }
 
