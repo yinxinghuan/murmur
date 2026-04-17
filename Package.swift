@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "OpenWhisper",
+    name: "Murmur",
     platforms: [
         .macOS(.v14)
     ],
@@ -12,12 +12,12 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "OpenWhisper",
+            name: "Murmur",
             dependencies: [
                 .product(name: "WhisperKit", package: "WhisperKit"),
             ],
-            path: "OpenWhisper",
-            exclude: ["Info.plist", "OpenWhisper.entitlements"],
+            path: "Murmur",
+            exclude: ["Info.plist", "Murmur.entitlements"],
             resources: [
                 .process("Resources")
             ]

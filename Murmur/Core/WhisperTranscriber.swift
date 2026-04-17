@@ -7,7 +7,7 @@ final class WhisperTranscriber: @unchecked Sendable {
     /// Check if a model is already downloaded locally
     func isModelDownloaded(name: String) -> Bool {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let localModel = appSupport.appendingPathComponent("OpenWhisper/Models/models/argmaxinc/whisperkit-coreml/openai_whisper-\(name)")
+        let localModel = appSupport.appendingPathComponent("Murmur/Models/models/argmaxinc/whisperkit-coreml/openai_whisper-\(name)")
         return FileManager.default.fileExists(atPath: localModel.path)
     }
 
@@ -15,7 +15,7 @@ final class WhisperTranscriber: @unchecked Sendable {
     func loadModel(name: String, progress: @escaping @Sendable (Double) -> Void) async throws {
         // Store models in Application Support (persistent) instead of Caches (macOS purges Caches)
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let modelBase = appSupport.appendingPathComponent("OpenWhisper/Models")
+        let modelBase = appSupport.appendingPathComponent("Murmur/Models")
         try FileManager.default.createDirectory(at: modelBase, withIntermediateDirectories: true)
 
         // Check if model already exists locally

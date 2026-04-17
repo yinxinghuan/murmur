@@ -3,7 +3,7 @@ import UserNotifications
 
 func owLog(_ msg: String) {
     let line = "\(Date()): \(msg)\n"
-    let path = "/tmp/openwhisper.log"
+    let path = "/tmp/murmur.log"
     if let fh = FileHandle(forWritingAtPath: path) {
         fh.seekToEndOfFile()
         if let data = line.data(using: .utf8) { fh.write(data) }
@@ -14,7 +14,7 @@ func owLog(_ msg: String) {
 }
 
 @main
-struct OpenWhisperApp: App {
+struct MurmurApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {

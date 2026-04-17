@@ -58,7 +58,7 @@ final class AppState {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                owLog("[OpenWhisper] Launch at login error: \(error)")
+                owLog("[Murmur] Launch at login error: \(error)")
             }
         }
     }
@@ -128,7 +128,7 @@ final class AppState {
     // MARK: - Setup
 
     func setup() async {
-        owLog("[OpenWhisper] Setting up...")
+        owLog("[Murmur] Setting up...")
         audioEngine = AudioEngine()
         transcriber = WhisperTranscriber()
         llmCleanup = LLMCleanup()
@@ -136,15 +136,15 @@ final class AppState {
         flowBarController = FlowBarController(appState: self)
 
         // Flow bar starts hidden — only shows during recording/transcribing
-        owLog("[OpenWhisper] Flow bar ready (hidden until recording)")
+        owLog("[Murmur] Flow bar ready (hidden until recording)")
 
         // Request mic permission
         microphoneGranted = await audioEngine?.requestPermission() ?? false
-        owLog("[OpenWhisper] Microphone permission: \(microphoneGranted)")
+        owLog("[Murmur] Microphone permission: \(microphoneGranted)")
 
         // Check accessibility
         accessibilityGranted = GlobalHotkey.checkAccessibility(prompt: true)
-        owLog("[OpenWhisper] Accessibility: \(accessibilityGranted)")
+        owLog("[Murmur] Accessibility: \(accessibilityGranted)")
 
         // Register global hotkey
         hotkey = GlobalHotkey(
@@ -156,22 +156,22 @@ final class AppState {
             }
         )
         hotkey?.register()
-        owLog("[OpenWhisper] Hotkey registered (Right Option)")
+        owLog("[Murmur] Hotkey registered (Right Option)")
 
         // Load Whisper model
-        owLog("[OpenWhisper] Loading model: \(whisperModel)...")
+        owLog("[Murmur] Loading model: \(whisperModel)...")
         await loadModel()
-        owLog("[OpenWhisper] Model loaded: \(modelLoaded)")
+        owLog("[Murmur] Model loaded: \(modelLoaded)")
 
         // Check Ollama availability
         ollamaAvailable = await LLMCleanup.checkAvailability()
-        owLog("[OpenWhisper] Ollama available: \(ollamaAvailable)")
+        owLog("[Murmur] Ollama available: \(ollamaAvailable)")
 
         // Setup reminders
         reminderManager = ReminderManager.shared
         let notifGranted = await reminderManager?.requestPermission() ?? false
-        owLog("[OpenWhisper] Notification permission: \(notifGranted)")
-        owLog("[OpenWhisper] Ready!")
+        owLog("[Murmur] Notification permission: \(notifGranted)")
+        owLog("[Murmur] Ready!")
     }
 
     func loadModel() async {
@@ -179,7 +179,7 @@ final class AppState {
         modelLoading = true
         modelLoadProgress = 0
         modelIsDownloading = !(transcriber?.isModelDownloaded(name: whisperModel) ?? false)
-        owLog("[OpenWhisper] Loading model: \(whisperModel) (download needed: \(modelIsDownloading))...")
+        owLog("[Murmur] Loading model: \(whisperModel) (download needed: \(modelIsDownloading))...")
         do {
             try await transcriber?.loadModel(name: whisperModel) { [weak self] progress in
                 Task { @MainActor in
@@ -188,11 +188,11 @@ final class AppState {
             }
             modelLoaded = true
             modelLoading = false
-            owLog("[OpenWhisper] Model loaded: \(modelLoaded)")
+            owLog("[Murmur] Model loaded: \(modelLoaded)")
         } catch {
             modelLoading = false
             lastError = "Failed to load model: \(error.localizedDescription)"
-            owLog("[OpenWhisper] Model load failed: \(error)")
+            owLog("[Murmur] Model load failed: \(error)")
         }
     }
 
@@ -201,14 +201,14 @@ final class AppState {
     func startRecording() {
         guard recordingState == .idle else { return }
         guard modelLoaded else {
-            owLog("[OpenWhisper] Cannot record — model not loaded yet")
+            owLog("[Murmur] Cannot record — model not loaded yet")
             return
         }
 
         // Save the currently focused app BEFORE we start recording,
         // so we can re-activate it when pasting the transcription
         targetApp = NSWorkspace.shared.frontmostApplication
-        owLog("[OpenWhisper] Target app: \(targetApp?.localizedName ?? "unknown")")
+        owLog("[Murmur] Target app: \(targetApp?.localizedName ?? "unknown")")
 
         recordingState = .recording
         recordingDuration = 0
@@ -240,20 +240,20 @@ final class AppState {
         guard recordingState == .recording else { return }
         recordingState = .transcribing
         playSound("Pop", volume: 0.2)
-        owLog("[OpenWhisper] Transcribing...")
+        owLog("[Murmur] Transcribing...")
 
         recordingTimer?.invalidate()
         recordingTimer = nil
 
         guard let audioData = audioEngine?.stopRecording() else {
-            owLog("[OpenWhisper] No audio captured")
+            owLog("[Murmur] No audio captured")
             recordingState = .idle
             hideFlowBarAfterDelay(0.3)
             return
         }
 
         guard audioData.count > 4800 else {
-            owLog("[OpenWhisper] Audio too short (\(audioData.count) samples)")
+            owLog("[Murmur] Audio too short (\(audioData.count) samples)")
             recordingState = .idle
             hideFlowBarAfterDelay(0.3)
             return
@@ -271,29 +271,29 @@ final class AppState {
                 guard !trimmed.isEmpty,
                       !trimmed.hasPrefix("[BLANK"),
                       !trimmed.hasPrefix("(BLANK") else {
-                    owLog("[OpenWhisper] Empty/blank transcription, skipping")
+                    owLog("[Murmur] Empty/blank transcription, skipping")
                     recordingState = .idle
                     hideFlowBarAfterDelay(0.3)
                     return
                 }
 
-                owLog("[OpenWhisper] Raw: \(text)")
+                owLog("[Murmur] Raw: \(text)")
 
                 // Check raw text for reminder intent BEFORE LLM cleanup can alter it
                 let isReminderCommand = ReminderManager.isReminder(text)
 
                 if isReminderCommand {
-                    owLog("[OpenWhisper] Reminder detected: \(text)")
+                    owLog("[Murmur] Reminder detected: \(text)")
                     lastTranscription = text
                     if ollamaAvailable {
                         let _ = await reminderManager?.handleReminder(text: text)
                     } else {
-                        owLog("[OpenWhisper] Cannot set reminder — Ollama not available")
+                        owLog("[Murmur] Cannot set reminder — Ollama not available")
                     }
                 } else {
                     if llmCleanupEnabled && ollamaAvailable {
                         text = await llmCleanup?.cleanup(text: text, model: llmModel) ?? text
-                        owLog("[OpenWhisper] Cleaned: \(text)")
+                        owLog("[Murmur] Cleaned: \(text)")
                     }
 
                     lastTranscription = text
@@ -306,7 +306,7 @@ final class AppState {
                     playSound("Glass", volume: 0.15)
                 }
             } catch {
-                owLog("[OpenWhisper] Error: \(error)")
+                owLog("[Murmur] Error: \(error)")
                 lastError = error.localizedDescription
                 playSound("Sosumi", volume: 0.2)
             }
