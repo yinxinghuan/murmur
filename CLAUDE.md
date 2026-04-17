@@ -1,79 +1,118 @@
 # Murmur — macOS 本地语音转文字
 
 Fork of [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app)，MIT 协议。
-目标：做一个精致版的中文语音输入工具并发布。
+**核心定位：人与 AI 代理沟通的语音桥梁。**
+
+GitHub: https://github.com/yinxinghuan/murmur
+当前版本: v1.2.0
 
 ## Tech Stack
 
 - Swift / SwiftUI, macOS 14+, Apple Silicon (ARM64)
 - SPM (Swift Package Manager), WhisperKit 0.9+
-- Ollama (本地 LLM 清理)
+- Ollama (本地 LLM 润色)
+- Bundle ID: `com.yinxinghuan.murmur`
 
 ## Build
 
 ```bash
+# Debug
 swift build -c debug --arch arm64
-# 必须 --arch arm64，否则默认 x86 + Rosetta 会导致 CoreML 崩溃
+
+# Release
+swift build -c release --arch arm64
+# 或
+bash build.sh
 ```
+
+**必须 `--arch arm64`**，否则默认 x86 + Rosetta 会导致 CoreML 崩溃。
 
 打包 .app:
 ```bash
-cp .build/arm64-apple-macosx/debug/OpenWhisper build/OpenWhisper.app/Contents/MacOS/
-cp OpenWhisper/Info.plist build/OpenWhisper.app/Contents/
-codesign --force --deep --sign - build/OpenWhisper.app
-cp -R build/OpenWhisper.app /Applications/
+ARCH_DIR=".build/arm64-apple-macosx/release"
+APP_DIR="build/Murmur.app/Contents"
+mkdir -p "$APP_DIR/MacOS" "$APP_DIR/Resources" "$APP_DIR/Frameworks"
+cp "$ARCH_DIR/Murmur" "$APP_DIR/MacOS/Murmur"
+cp Murmur/Info.plist "$APP_DIR/Info.plist"
+cp Murmur/Resources/AppIcon.icns "$APP_DIR/Resources/AppIcon.icns"
+[ -d "$ARCH_DIR/Murmur_Murmur.bundle" ] && cp -R "$ARCH_DIR/Murmur_Murmur.bundle" "$APP_DIR/Resources/"
+codesign --force --deep --sign - build/Murmur.app
+cp -R build/Murmur.app /Applications/
 ```
 
 ## 项目结构
 
 ```
-OpenWhisper/
-├── App/AppState.swift       — 全局状态、录音流程、设置持久化
-├── App/OpenWhisperApp.swift — 入口
+Murmur/
+├── App/
+│   ├── AppState.swift        — 全局状态、录音流程、设置持久化、语音指令、转写历史
+│   └── MurmurApp.swift       — 入口、菜单栏图标
 ├── Core/
-│   ├── AudioEngine.swift    — 麦克风采集 + 16kHz 重采样
-│   ├── WhisperTranscriber.swift — WhisperKit 模型加载与转写
-│   ├── LLMCleanup.swift     — Ollama LLM 标点/语法清理
-│   ├── TextInjector.swift   — 自动粘贴 (CGEvent Cmd+V)
-│   └── ReminderManager.swift
-├── Hotkey/GlobalHotkey.swift — 右 Option 键监听
+│   ├── AudioEngine.swift     — 麦克风采集 + 16kHz 重采样
+│   ├── WhisperTranscriber.swift — 模型加载/校验/转写、幻觉过滤
+│   ├── LLMCleanup.swift      — Ollama LLM 润色 + 术语保护
+│   ├── TextInjector.swift    — 自动粘贴 (CGEvent Cmd+V)
+│   └── ReminderManager.swift — 语音提醒
+├── Hotkey/GlobalHotkey.swift  — 右 Option 键监听（按住/切换两种模式）
 ├── UI/
-│   ├── FlowBarView.swift    — 3 主题 FlowBar (极简/毛玻璃/极光)
-│   ├── FlowBarWindow.swift  — NSPanel 浮窗控制
-│   ├── SettingsView.swift   — 设置面板
+│   ├── FlowBarView.swift     — 2 主题 FlowBar（黑底/白底）
+│   ├── FlowBarWindow.swift   — NSPanel 浮窗控制
+│   ├── SettingsView.swift    — 设置面板（中英双语）
+│   ├── MurmurLogo.swift      — 波形 Logo + 菜单栏图标
 │   └── AudioWaveformView.swift
-└── Resources/               — 图标资源
+└── Resources/
+    ├── AppIcon.icns           — 波形柱图标
+    ├── menubar_icon.png       — 菜单栏图标 PNG
+    └── Assets.xcassets/       — 图标资源
 ```
 
-## 相对原版的改动
+## 功能清单
 
-### 功能
-- 新增 large-v3 / large-v3_turbo Whisper 模型支持
-- 默认语言中文，LLM prompt 适配中文（简体、标点、中英混合）
-- LLM 模型可在设置 UI 中选择（不再硬编码）
-- 模型下载状态标识（✓ 已下载 / ↓ 需下载）
+### 核心
+- 按住右 ⌥ 说话，松开自动粘贴（按住模式）
+- 按一次右 ⌥ 开始，再按一次停止（切换模式，适合长段落）
+- 6 种 Whisper 模型（tiny → large-v3），根据内存自动推荐
+- 繁简中文自动转换（简体/繁体/不转换）
+- 翻译模式（说中文输出英文）
+- 29 种语言
 
-### 交互 & UI
-- FlowBar 三主题：极简(voiceFirst) / 毛玻璃(spatialGlass) / 极光(aurora)
-- FlowBar idle 时完全隐藏，仅录音/转写时显示
-- 声音反馈（低音量系统音）：开始 Tink / 停止 Pop / 完成 Glass / 错误 Sosumi
-- 设置面板中新增 Theme 分段选择器、LLM Model 选择器
+### AI 对话优化（v1.2.0）
+- **代码术语保护** — 自定义词汇表，LLM 润色时保持原样
+- **转写历史** — 最近 20 条，点击复制，持久化存储
+- **连续听写** — 切换模式，5 分钟自动停止安全限制
+- **语音指令** — 换行/发送/删除/撤销/全选
 
-### 构建
-- 必须 ARM64 编译（x86 + Rosetta 下 CoreML large 模型会崩溃）
-- Info.plist 需手动复制到 .app bundle（build.sh 路径问题）
+### 可靠性
+- 静音检测（RMS < 0.005 跳过）
+- noSpeechThreshold 0.8
+- 中英文幻觉过滤词库
+- 模型完整性深度校验（检查 weights 文件）
+- 启动时自动清理不完整下载
+- 模型加载失败 → 显示重新下载/切换模型按钮
+- 模型下载完成系统通知
 
-## 已知问题
+### UI
+- FlowBar 黑底/白底主题，idle 隐藏
+- 首次启动三步引导
+- 中英双语设置界面
+- 焦点色跟随系统
+- Ollama 状态实时检测
+- 波形柱 App 图标 + 菜单栏图标
 
-- 每次重新编译签名后，macOS 辅助功能权限会失效，需重新授权
-- Bundle ID 仍为 com.openwhisper.app，发布前需要改
-- App 名称仍为 OpenWhisper，发布前需要重命名为 Murmur
+## 关键踩坑
+
+- **必须 `--arch arm64` 编译**，否则 Rosetta 下 CoreML large 模型崩溃
+- 每次重新编译签名后辅助功能权限失效
+- NSImage 自定义菜单栏图标在 release 构建不渲染 → 改用 PNG 资源
+- SwiftUI Picker 在 MenuBarExtra 里不会因数据变化自动刷新标签文字 → 用 `.id()` 强制
+- WhisperKit 下载目录会自动创建 `models/argmaxinc/whisperkit-coreml/` 路径（两层 models 是正常的）
+- `isModelDownloaded` 不能只检查目录存在，要检查 weights/weight.bin 或 coremldata.bin
 
 ## 下一步
 
-- [ ] 重命名 OpenWhisper → Murmur（Bundle ID、UI 文字、目录名）
-- [ ] 设置面板 UI 现代化改造
-- [ ] App 图标设计
-- [ ] Release 构建 + .dmg 打包
-- [ ] 在 yinxinghuan GitHub 创建 murmur 仓库并发布
-- [ ] Homebrew cask 发布（可选）
+- [ ] 自动发送（检测 AI 聊天框自动按回车）
+- [ ] Prompt 模板（语音触发预设 prompt）
+- [ ] 上下文感知（根据前台 app 调整润色风格）
+- [ ] 菜单栏图标录音动画
+- [ ] 白底 FlowBar 阴影裁剪问题
+- [ ] Homebrew cask（可选）
