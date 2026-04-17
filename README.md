@@ -6,7 +6,7 @@
 
 # Murmur (English)
 
-A local voice-to-text tool for macOS. Hold a key, speak, release — text appears at your cursor.
+A local voice-to-text tool for macOS, designed to make communicating with AI agents easier. Hold a key, speak, release — text appears at your cursor.
 
 All speech recognition runs on-device via [WhisperKit](https://github.com/argmaxinc/WhisperKit). Nothing leaves your Mac.
 
@@ -77,7 +77,7 @@ MIT
 
 # Murmur (中文)
 
-macOS 本地语音转文字工具。按住说话，松开出字，文字自动粘贴到光标处。
+macOS 本地语音转文字工具，目标是让用户与 AI 代理的沟通更自然。按住说话，松开出字，文字自动粘贴到光标处。
 
 所有语音识别通过 [WhisperKit](https://github.com/argmaxinc/WhisperKit) 在本地运行，不上传任何数据。
 
