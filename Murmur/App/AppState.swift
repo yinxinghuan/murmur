@@ -436,6 +436,17 @@ final class AppState {
 
                 owLog("[Murmur] Raw: \(text)")
 
+                // Language mismatch detection: if user set Chinese but output is all ASCII, discard
+                if language == "zh" && !translateToEnglish {
+                    let chineseChars = text.unicodeScalars.filter { $0.value > 0x4E00 && $0.value < 0x9FFF }.count
+                    if chineseChars == 0 && text.count > 3 {
+                        owLog("[Murmur] Language mismatch: expected Chinese but got all non-Chinese, skipping")
+                        recordingState = .idle
+                        hideFlowBarAfterDelay(0.3)
+                        return
+                    }
+                }
+
                 // Chinese variant conversion (zero-cost, no LLM needed)
                 if (language == "zh" || language == "") && chineseVariant != "auto" {
                     text = convertChineseVariant(text, to: chineseVariant)

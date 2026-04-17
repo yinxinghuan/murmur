@@ -4,7 +4,8 @@ struct SettingsView: View {
     @Environment(AppState.self) var appState
 
     private var zh: Bool { appState.uiLanguage == "zh" }
-    private let R: CGFloat = 200  // right column width
+    private let R: CGFloat = 200
+    @State private var showAdvanced = false
 
     var body: some View {
         @Bindable var appState = appState
@@ -13,13 +14,20 @@ struct SettingsView: View {
 
             // ── Header ──
             HStack(spacing: 10) {
-                MurmurLogo(color: Color.primary).frame(width: 32, height: 32)
+                MurmurLogo(color: Color.primary).frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Murmur").font(.system(size: 18, weight: .semibold))
                     Text(zh ? "本地语音转文字" : "Local voice to text")
                         .font(.system(size: 11)).foregroundStyle(.secondary)
                 }
                 Spacer()
+                Picker("", selection: $appState.uiLanguage) {
+                    Text("中").tag("zh")
+                    Text("EN").tag("en")
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 72)
             }
 
             // ── Onboarding ──
@@ -128,7 +136,7 @@ struct SettingsView: View {
                         .labelsHidden().frame(width: R, alignment: .trailing)
                     }
                 }
-                .padding(.leading, 28)
+                .padding(.leading, 12)
             }
 
             // Auto-paste
@@ -138,18 +146,13 @@ struct SettingsView: View {
                     .frame(width: R, alignment: .trailing)
             }
 
-            // Flow bar
+            // Flow bar theme (always on, just pick style)
             row(zh ? "悬浮条" : "Flow Bar", icon: "capsule") {
-                HStack(spacing: 6) {
-                    if appState.flowBarEnabled {
-                        Picker("", selection: $appState.flowBarTheme) {
-                            Text(zh ? "黑底" : "Dark").tag("voiceFirst")
-                            Text(zh ? "白底" : "Light").tag("invert")
-                        }.labelsHidden().pickerStyle(.segmented)
-                    }
-                    Toggle("", isOn: $appState.flowBarEnabled)
-                        .toggleStyle(.switch).labelsHidden().controlSize(.mini)
-                }.frame(width: R, alignment: .trailing)
+                Picker("", selection: $appState.flowBarTheme) {
+                    Text(zh ? "黑底" : "Dark").tag("voiceFirst")
+                    Text(zh ? "白底" : "Light").tag("invert")
+                }.labelsHidden().pickerStyle(.segmented)
+                .frame(width: R, alignment: .trailing)
             }
 
             // Launch at login
@@ -157,15 +160,6 @@ struct SettingsView: View {
                 Toggle("", isOn: $appState.launchAtLogin)
                     .toggleStyle(.switch).labelsHidden().controlSize(.mini)
                     .frame(width: R, alignment: .trailing)
-            }
-
-            // UI Language
-            row(zh ? "界面语言" : "UI Language", icon: "translate") {
-                Picker("", selection: $appState.uiLanguage) {
-                    Text("中文").tag("zh")
-                    Text("EN").tag("en")
-                }.labelsHidden().pickerStyle(.segmented)
-                .frame(width: R, alignment: .trailing)
             }
 
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -200,35 +194,56 @@ struct SettingsView: View {
                 }
             }
 
-            // Voice commands
-            row(zh ? "语音指令" : "Voice Cmd", icon: "mic.badge.plus") {
-                Toggle("", isOn: $appState.voiceCommandsEnabled)
-                    .toggleStyle(.switch).labelsHidden().controlSize(.mini)
-                    .frame(width: R, alignment: .trailing)
+            // Advanced — collapsed by default
+            HStack {
+                Text(zh ? "高级功能" : "Advanced")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Image(systemName: showAdvanced ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
             }
-            if appState.voiceCommandsEnabled {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(zh ? "\"换行\" → ↵" : "\"new line\" → ↵").font(.caption2)
-                        Text(zh ? "\"发送\" → ↵" : "\"send\" → ↵").font(.caption2)
-                        Text(zh ? "\"删除\" → ⌫" : "\"delete\" → ⌫").font(.caption2)
-                    }
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(zh ? "\"撤销\" → ⌘Z" : "\"undo\" → ⌘Z").font(.caption2)
-                        Text(zh ? "\"全选\" → ⌘A" : "\"select all\" → ⌘A").font(.caption2)
-                    }
-                }
-                .foregroundStyle(.tertiary).padding(.leading, 28)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.2)) { showAdvanced.toggle() }
             }
 
-            // Protected terms (only when LLM is on)
-            if appState.llmCleanupEnabled {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(zh ? "保护术语（逗号分隔）" : "Protected terms (comma separated)")
-                        .font(.caption).foregroundStyle(.secondary)
-                    TextField(zh ? "如: useState, API" : "e.g. useState, API", text: $appState.customTerms)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 12, design: .monospaced))
+            if showAdvanced {
+                // Voice commands
+                row(zh ? "语音指令" : "Voice Cmd", icon: "mic.badge.plus") {
+                    Toggle("", isOn: $appState.voiceCommandsEnabled)
+                        .toggleStyle(.switch).labelsHidden().controlSize(.mini)
+                        .frame(width: R, alignment: .trailing)
+                }
+                if appState.voiceCommandsEnabled {
+                    Text(zh ? "在语音末尾说指令来控制键盘操作" : "Say a command at end of speech")
+                        .font(.caption).foregroundStyle(.tertiary)
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(zh ? "\"换行\" → ↵" : "\"new line\" → ↵").font(.caption2)
+                            Text(zh ? "\"发送\" → ↵" : "\"send\" → ↵").font(.caption2)
+                            Text(zh ? "\"删除\" → ⌫" : "\"delete\" → ⌫").font(.caption2)
+                        }
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(zh ? "\"撤销\" → ⌘Z" : "\"undo\" → ⌘Z").font(.caption2)
+                            Text(zh ? "\"全选\" → ⌘A" : "\"select all\" → ⌘A").font(.caption2)
+                        }
+                    }
+                    .foregroundStyle(.tertiary).padding(.leading, 12)
+                }
+
+                // Protected terms (only when LLM is on)
+                if appState.llmCleanupEnabled {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(zh ? "保护术语（逗号分隔）" : "Protected terms (comma separated)")
+                            .font(.caption).foregroundStyle(.secondary)
+                        TextField(zh ? "如: useState, API" : "e.g. useState, API", text: $appState.customTerms)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 12, design: .monospaced))
+                        Text(zh ? "文本润色时保持这些术语不被修改" : "Keep these terms unchanged during text polish")
+                            .font(.caption).foregroundStyle(.tertiary)
+                    }
                 }
             }
 

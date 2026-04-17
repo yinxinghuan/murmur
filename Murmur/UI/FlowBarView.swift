@@ -48,9 +48,9 @@ struct MinimalFlowBar: View {
                 // Toggle mode: show stop indicator
                 if isToggleMode {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(.red)
+                        .fill(.white)
                         .frame(width: 10, height: 10)
-                        .opacity(stopPulse ? 1.0 : 0.5)
+                        .opacity(stopPulse ? 1.0 : 0.4)
                 }
                 AudioBars(level: appState.audioLevel, barWidth: 3, barMaxH: 16)
                 Text(fmtTime(appState.recordingDuration))
@@ -181,9 +181,9 @@ struct InvertFlowBar: View {
             HStack(spacing: 10) {
                 if isToggleMode {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(.red)
+                        .fill(.black)
                         .frame(width: 10, height: 10)
-                        .opacity(stopPulse ? 1.0 : 0.5)
+                        .opacity(stopPulse ? 1.0 : 0.4)
                 }
                 AudioBars(level: appState.audioLevel, color: .black, barWidth: 3, barMaxH: 16)
                 Text(fmtTime(appState.recordingDuration))
