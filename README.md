@@ -65,9 +65,24 @@ Enable in settings. Fixes punctuation, removes filler words, preserves code term
 - Apple Silicon (M1/M2/M3/M4)
 - Xcode (build from source only)
 
+## What's Different from OpenWhisper
+
+Murmur is forked from [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app) and adds:
+
+- Large v3 / Large v3 Turbo model support
+- Toggle dictation mode for long conversations
+- Voice commands (send, new line, delete, undo)
+- Code term protection during text polish
+- Transcription history
+- Chinese optimization: Simplified/Traditional conversion, hallucination filtering
+- Silent audio detection, language mismatch detection
+- Model integrity checks, download failure recovery
+- Redesigned settings with basic/advanced split
+- Bilingual UI (Chinese/English)
+
 ## Credits
 
-Forked from [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app) (MIT License).
+Thanks to [Rajvardhman05](https://github.com/Rajvardhman05) for creating OpenWhisper — the solid foundation this project builds on.
 
 ## License
 
@@ -136,9 +151,24 @@ ollama pull qwen2.5:1.5b
 - Apple Silicon（M1/M2/M3/M4）
 - Xcode（仅源码编译需要）
 
+## 相较 OpenWhisper 的改进
+
+Murmur fork 自 [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app)，主要改进：
+
+- 新增 Large v3 / Large v3 Turbo 模型支持
+- 切换录音模式，适合长对话
+- 语音指令（发送、换行、删除、撤销）
+- 代码术语保护
+- 转写历史
+- 中文优化：繁简转换、幻觉过滤
+- 静音检测、语言不匹配检测
+- 模型完整性校验、下载失败恢复
+- 设置面板分层（基础/高级）
+- 中英双语界面
+
 ## 致谢
 
-Fork 自 [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app)（MIT License）。
+感谢 [Rajvardhman05](https://github.com/Rajvardhman05) 创建了 OpenWhisper，为本项目提供了优秀的基础。
 
 ## License
 
