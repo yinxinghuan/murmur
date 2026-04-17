@@ -366,12 +366,24 @@ struct SettingsView: View {
             HStack {
                 Label(zh ? "快捷键" : "Hotkey", systemImage: "command")
                 Spacer()
-                Text(zh ? "按住右 ⌥" : "Hold Right ⌥")
+                Text("Right ⌥")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor))
+            }
+
+            HStack {
+                Label(zh ? "录音方式" : "Mode", systemImage: "hand.tap")
+                Spacer()
+                Picker("", selection: $appState.dictationMode) {
+                    Text(zh ? "按住" : "Hold").tag("hold")
+                    Text(zh ? "切换" : "Toggle").tag("toggle")
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 120)
             }
 
             // History

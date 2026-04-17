@@ -53,6 +53,10 @@ final class AppState {
     var autoPasteEnabled: Bool {
         didSet { UserDefaults.standard.set(autoPasteEnabled, forKey: "autoPasteEnabled") }
     }
+    // "hold" = hold-to-talk, "toggle" = press-to-start, press-to-stop
+    var dictationMode: String {
+        didSet { UserDefaults.standard.set(dictationMode, forKey: "dictationMode") }
+    }
     var uiLanguage: String {
         didSet { UserDefaults.standard.set(uiLanguage, forKey: "uiLanguage") }
     }
@@ -146,6 +150,7 @@ final class AppState {
         translateToEnglish = defaults.object(forKey: "translateToEnglish") as? Bool ?? false
         chineseVariant = defaults.string(forKey: "chineseVariant") ?? "simplified"
         autoPasteEnabled = defaults.object(forKey: "autoPasteEnabled") as? Bool ?? true
+        dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         uiLanguage = defaults.string(forKey: "uiLanguage") ?? "zh"
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
@@ -177,10 +182,30 @@ final class AppState {
         // Register global hotkey
         hotkey = GlobalHotkey(
             onPress: { [weak self] in
-                Task { @MainActor in self?.startRecording() }
+                Task { @MainActor in
+                    guard let self else { return }
+                    if self.dictationMode == "toggle" {
+                        // Toggle mode: press to start or stop
+                        if self.recordingState == .recording {
+                            self.stopRecording()
+                        } else {
+                            self.startRecording()
+                        }
+                    } else {
+                        // Hold mode: press to start
+                        self.startRecording()
+                    }
+                }
             },
             onRelease: { [weak self] in
-                Task { @MainActor in self?.stopRecording() }
+                Task { @MainActor in
+                    guard let self else { return }
+                    if self.dictationMode == "hold" {
+                        // Hold mode: release to stop
+                        self.stopRecording()
+                    }
+                    // Toggle mode: release does nothing
+                }
             }
         )
         hotkey?.register()
@@ -344,7 +369,12 @@ final class AppState {
         // Start duration timer
         recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.recordingDuration += 0.1
+                guard let self else { return }
+                self.recordingDuration += 0.1
+                // Safety: auto-stop after 5 minutes in toggle mode
+                if self.dictationMode == "toggle" && self.recordingDuration >= 300 {
+                    self.stopRecording()
+                }
             }
         }
 
