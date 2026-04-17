@@ -3,22 +3,49 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppState.self) var appState
 
+    private var zh: Bool { appState.uiLanguage == "zh" }
+
     var body: some View {
         @Bindable var appState = appState
 
-        VStack(alignment: .leading, spacing: 14) {
-            header
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack(spacing: 10) {
+                MurmurLogo(color: Color.primary)
+                    .frame(width: 32, height: 32)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Murmur")
+                        .font(.system(size: 18, weight: .semibold))
+                    Text(zh ? "本地语音转文字" : "Local voice to text")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
 
-            Divider()
-
-            // Permissions
-            permissionsSection
+            // Permission warnings (only show if not granted)
+            if !appState.microphoneGranted || !appState.accessibilityGranted {
+                VStack(spacing: 6) {
+                    if !appState.microphoneGranted {
+                        permissionWarning(
+                            zh ? "需要麦克风权限" : "Microphone access needed",
+                            action: { openSystemSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") }
+                        )
+                    }
+                    if !appState.accessibilityGranted {
+                        permissionWarning(
+                            zh ? "需要辅助功能权限" : "Accessibility access needed",
+                            action: { openSystemSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") }
+                        )
+                    }
+                }
+            }
 
             Divider()
 
             // Model
             HStack {
-                Label("Model", systemImage: "cpu")
+                Label(zh ? "语音模型" : "Model", systemImage: "waveform")
                 Spacer()
                 Picker("", selection: $appState.whisperModel) {
                     whisperModelLabel("Tiny (39 MB)", name: "tiny")
@@ -29,206 +56,176 @@ struct SettingsView: View {
                     whisperModelLabel("Large v3 Turbo (1.6 GB)", name: "large-v3_turbo")
                 }
                 .labelsHidden()
-                .frame(width: 210)
+                .frame(maxWidth: .infinity, alignment: .trailing)
                 .onChange(of: appState.whisperModel) {
                     Task { await appState.loadModel() }
                 }
             }
 
-            // Language
             HStack {
-                Label("Language", systemImage: "globe")
+                Label(zh ? "输入语言" : "Language", systemImage: "globe")
                 Spacer()
                 Picker("", selection: $appState.language) {
-                    Text("Auto-detect").tag("")
+                    Text(zh ? "自动检测" : "Auto").tag("")
+                    Text("中文").tag("zh")
                     Text("English").tag("en")
-                    Text("Spanish").tag("es")
-                    Text("French").tag("fr")
-                    Text("German").tag("de")
-                    Text("Hindi").tag("hi")
-                    Text("Telugu").tag("te")
-                    Text("Tamil").tag("ta")
-                    Text("Kannada").tag("kn")
-                    Text("Malayalam").tag("ml")
-                    Text("Bengali").tag("bn")
-                    Text("Marathi").tag("mr")
-                    Text("Gujarati").tag("gu")
-                    Text("Urdu").tag("ur")
-                    Text("Punjabi").tag("pa")
-                    Text("Japanese").tag("ja")
-                    Text("Chinese").tag("zh")
-                    Text("Korean").tag("ko")
-                    Text("Russian").tag("ru")
-                    Text("Portuguese").tag("pt")
-                    Text("Arabic").tag("ar")
-                    Text("Italian").tag("it")
-                    Text("Dutch").tag("nl")
-                    Text("Turkish").tag("tr")
-                    Text("Polish").tag("pl")
-                    Text("Thai").tag("th")
-                    Text("Vietnamese").tag("vi")
-                    Text("Indonesian").tag("id")
-                    Text("Ukrainian").tag("uk")
-                    Text("Swedish").tag("sv")
+                    Text("日本語").tag("ja")
+                    Text("한국어").tag("ko")
+                    Text("Español").tag("es")
+                    Text("Français").tag("fr")
+                    Text("Deutsch").tag("de")
+                    Text("Русский").tag("ru")
+                    Text("Português").tag("pt")
+                    Text("العربية").tag("ar")
+                    Text("Italiano").tag("it")
+                    Text("Tiếng Việt").tag("vi")
+                    Text("ไทย").tag("th")
+                    Text("हिन्दी").tag("hi")
+                    Text("Bahasa").tag("id")
                 }
                 .labelsHidden()
-                .frame(width: 150)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+
+            HStack {
+                Label(zh ? "输出" : "Output", systemImage: "character.bubble")
+                Spacer()
+                Picker("", selection: $appState.translateToEnglish) {
+                    Text(zh ? "原文" : "Original").tag(false)
+                    Text(zh ? "译为英文" : "English").tag(true)
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
             Divider()
 
             // LLM Cleanup
             HStack {
-                Label("LLM Cleanup", systemImage: "sparkles")
+                Label(zh ? "文本润色" : "Text polish", systemImage: "sparkle")
                 Spacer()
                 if appState.llmCleanupEnabled {
                     Circle()
-                        .fill(appState.ollamaAvailable ? .green : .red)
-                        .frame(width: 6, height: 6)
-                        .help(appState.ollamaAvailable ? "Ollama connected" : "Ollama not running")
+                        .fill(appState.ollamaAvailable ? Color.primary : Color.red)
+                        .frame(width: 5, height: 5)
                 }
                 Toggle("", isOn: $appState.llmCleanupEnabled)
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .controlSize(.small)
+                    .toggleStyle(.switch).labelsHidden().controlSize(.mini)
             }
 
-            // LLM Model
             if appState.llmCleanupEnabled {
                 HStack {
-                    Label("LLM Model", systemImage: "brain")
+                    Label(zh ? "润色模型" : "LLM Model", systemImage: "cpu")
                     Spacer()
                     Picker("", selection: $appState.llmModel) {
-                        llmModelLabel("qwen2.5:1.5b (快)", name: "qwen2.5:1.5b")
-                        llmModelLabel("qwen2.5:3b", name: "qwen2.5:3b")
-                        llmModelLabel("qwen2.5:7b (慢)", name: "qwen2.5:7b")
-                        llmModelLabel("gemma4:e4b", name: "gemma4:e4b")
+                        llmModelLabel("qwen2.5:1.5b (986 MB)", name: "qwen2.5:1.5b")
+                        llmModelLabel("qwen2.5:3b (1.9 GB)", name: "qwen2.5:3b")
+                        llmModelLabel("qwen2.5:7b (4.7 GB)", name: "qwen2.5:7b")
+                        llmModelLabel("gemma4:e4b (9.6 GB)", name: "gemma4:e4b")
                     }
                     .labelsHidden()
-                    .frame(width: 210)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
 
-            // Auto-paste
+            Divider()
+
             HStack {
-                Label("Auto-paste", systemImage: "doc.on.clipboard")
+                Label(zh ? "自动粘贴" : "Auto-paste", systemImage: "doc.on.clipboard")
                 Spacer()
                 Toggle("", isOn: $appState.autoPasteEnabled)
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .controlSize(.small)
+                    .toggleStyle(.switch).labelsHidden().controlSize(.mini)
             }
 
-            // Flow Bar
             HStack {
-                Label("Flow Bar", systemImage: "rectangle.bottomhalf.filled")
+                Label(zh ? "悬浮条" : "Flow Bar", systemImage: "capsule")
                 Spacer()
-                Toggle("", isOn: $appState.flowBarEnabled)
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .controlSize(.small)
-            }
-
-            // Theme
-            if appState.flowBarEnabled {
-                HStack {
-                    Label("Theme", systemImage: "paintbrush")
-                    Spacer()
+                if appState.flowBarEnabled {
                     Picker("", selection: $appState.flowBarTheme) {
-                        Text("极简").tag("voiceFirst")
-                        Text("毛玻璃").tag("spatialGlass")
-                        Text("极光").tag("aurora")
+                        Text(zh ? "黑底" : "Dark").tag("voiceFirst")
+                        Text(zh ? "白底" : "Light").tag("invert")
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 180)
+                    .frame(width: 100)
                 }
+                Toggle("", isOn: $appState.flowBarEnabled)
+                    .toggleStyle(.switch).labelsHidden().controlSize(.mini)
             }
 
-            // Launch at Login
             HStack {
-                Label("Launch at Login", systemImage: "arrow.right.circle")
+                Label(zh ? "开机启动" : "Launch at Login", systemImage: "power")
                 Spacer()
                 Toggle("", isOn: $appState.launchAtLogin)
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .controlSize(.small)
+                    .toggleStyle(.switch).labelsHidden().controlSize(.mini)
             }
 
-            Divider()
-
-            // Reminders
-            remindersSection
-
-            Divider()
-
-            // Trigger hotkey
             HStack {
-                Label("Trigger", systemImage: "keyboard")
+                Label(zh ? "界面语言" : "UI Language", systemImage: "translate")
                 Spacer()
-                Text("Hold Right ⌥")
-                    .font(.system(.body, design: .monospaced))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(.quaternary)
-                    )
+                Picker("", selection: $appState.uiLanguage) {
+                    Text("中文").tag("zh")
+                    Text("EN").tag("en")
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 100)
             }
 
-            // Model loading status
+            HStack {
+                Label(zh ? "快捷键" : "Hotkey", systemImage: "command")
+                Spacer()
+                Text(zh ? "按住右 ⌥" : "Hold Right ⌥")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(.black))
+            }
+
+            // Status
             if appState.modelLoading {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
                     Text(appState.modelLoadProgress > 0
                          ? (appState.modelIsDownloading
-                            ? "Downloading \(appState.whisperModel) model — \(Int(appState.modelLoadProgress * 100))%"
-                            : "Switching to \(appState.whisperModel) model...")
-                         : "Loading \(appState.whisperModel) model...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                            ? "\(zh ? "下载中" : "Downloading") \(Int(appState.modelLoadProgress * 100))%"
+                            : "\(zh ? "切换中" : "Switching")...")
+                         : "\(zh ? "加载中" : "Loading")...")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             } else if !appState.modelLoaded {
                 HStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.circle")
-                        .foregroundStyle(.orange)
-                    Text("Model not loaded")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
+                    Text(zh ? "模型未加载" : "Model not loaded")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
 
-            // Last error
             if let error = appState.lastError {
                 HStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.yellow)
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+                    Text(error).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 }
             }
 
             Divider()
 
-            // Footer
+            // Quit — same style as other rows
             HStack {
-                Text("v1.0.0")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                Label(zh ? "退出 Murmur" : "Quit Murmur", systemImage: "xmark.circle")
                 Spacer()
-                Button("Quit OpenWhisper") {
-                    NSApplication.shared.terminate(nil)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.red)
-                .font(.callout)
+                Text("v1.0.0").font(.caption).foregroundStyle(.tertiary)
+            }
+            .onTapGesture {
+                NSApplication.shared.terminate(nil)
             }
         }
+        .labelStyle(SettingsLabelStyle())
+        .tint(.black)
         .padding(16)
-        .frame(width: 330)
+        .frame(width: 340)
         .onAppear {
             appState.refreshPermissions()
             appState.refreshDownloadedModels()
@@ -236,227 +233,51 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Model Labels
+    // MARK: - Helpers
+
+    private func permissionWarning(_ text: String, action: @escaping () -> Void) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .font(.system(size: 12))
+            Text(text)
+                .font(.callout)
+            Spacer()
+            Button(zh ? "授权" : "Grant") { action() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 8).fill(.orange.opacity(0.1)))
+    }
 
     private func whisperModelLabel(_ label: String, name: String) -> some View {
         let downloaded = appState.downloadedWhisperModels.contains(name)
-        return Text("\(downloaded ? "✓ " : "↓ ")\(label)").tag(name)
+        return Text("\(label)\(downloaded ? "" : " ·")").tag(name)
     }
 
     private func llmModelLabel(_ label: String, name: String) -> some View {
         let installed = appState.installedLLMModels.contains(name)
-        return Text("\(installed ? "✓ " : "↓ ")\(label)").tag(name)
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        HStack {
-            Image(systemName: "mic.fill")
-                .font(.title2)
-                .foregroundStyle(Color(red: 0.08, green: 0.72, blue: 0.65))
-            VStack(alignment: .leading, spacing: 2) {
-                Text("OpenWhisper")
-                    .font(.headline)
-                Text("100% local voice-to-text")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            StatusBadge(state: appState.recordingState)
-        }
-    }
-
-    // MARK: - Permissions Section
-
-    private var permissionsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Permissions")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            PermissionRow(
-                icon: "mic.fill",
-                label: "Microphone",
-                detail: "Voice recording",
-                granted: appState.microphoneGranted,
-                action: { openSystemSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") }
-            )
-
-            PermissionRow(
-                icon: "hand.raised.fill",
-                label: "Accessibility",
-                detail: "Hotkey & auto-paste",
-                granted: appState.accessibilityGranted,
-                action: { openSystemSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") }
-            )
-        }
-    }
-
-    // MARK: - Reminders Section
-
-    private var remindersSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Reminders")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if !ReminderManager.shared.reminders.isEmpty {
-                    Button("Clear All") {
-                        ReminderManager.shared.cancelAll()
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.red)
-                    .font(.caption)
-                }
-            }
-
-            let reminders = ReminderManager.shared.reminders
-            if reminders.isEmpty {
-                HStack(spacing: 6) {
-                    Image(systemName: "bell.slash")
-                        .foregroundStyle(.tertiary)
-                        .font(.system(size: 12))
-                    Text("No active reminders")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            } else {
-                ForEach(reminders) { reminder in
-                    let fired = reminder.fireDate <= Date()
-                    HStack(spacing: 8) {
-                        Image(systemName: fired ? "bell.and.waves.left.and.right" : "bell.fill")
-                            .foregroundStyle(fired ? .gray : .orange)
-                            .font(.system(size: 10))
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(reminder.task)
-                                .font(.callout)
-                                .lineLimit(1)
-                                .foregroundStyle(fired ? .secondary : .primary)
-                            Text(fired ? "Fired — \(formatReminderDate(reminder.fireDate))" : formatReminderDate(reminder.fireDate))
-                                .font(.caption2)
-                                .foregroundStyle(fired ? .tertiary : .secondary)
-                        }
-                        Spacer()
-                        Button {
-                            ReminderManager.shared.cancelReminder(id: reminder.id)
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.tertiary)
-                                .font(.system(size: 14))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.vertical, 2)
-                    .opacity(fired ? 0.6 : 1.0)
-                }
-            }
-
-            HStack(spacing: 4) {
-                Image(systemName: "info.circle")
-                    .font(.system(size: 10))
-                Text("Say \"Remind me to...\" to set a reminder")
-                    .font(.caption2)
-            }
-            .foregroundStyle(.quaternary)
-        }
-    }
-
-    private func formatReminderDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        let calendar = Calendar.current
-        if calendar.isDateInToday(date) {
-            formatter.dateFormat = "'Today at' h:mm a"
-        } else if calendar.isDateInTomorrow(date) {
-            formatter.dateFormat = "'Tomorrow at' h:mm a"
-        } else {
-            formatter.dateFormat = "MMM d 'at' h:mm a"
-        }
-        return formatter.string(from: date)
+        return Text("\(label)\(installed ? "" : " ·")").tag(name)
     }
 
     private func openSystemSettings(_ url: String) {
-        if let url = URL(string: url) {
-            NSWorkspace.shared.open(url)
+        if let url = URL(string: url) { NSWorkspace.shared.open(url) }
+    }
+}
+
+// MARK: - Unified Label Style (fixed icon width for alignment)
+
+struct SettingsLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 8) {
+            configuration.icon
+                .font(.system(size: 15))
+                .foregroundStyle(.primary)
+                .frame(width: 22, alignment: .center)
+            configuration.title
         }
     }
 }
 
-// MARK: - Permission Row
-
-struct PermissionRow: View {
-    let icon: String
-    let label: String
-    let detail: String
-    let granted: Bool
-    let action: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 12))
-                .foregroundStyle(granted ? .green : .orange)
-                .frame(width: 18)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label)
-                    .font(.callout)
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-
-            Spacer()
-
-            if granted {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .font(.system(size: 14))
-            } else {
-                Button("Grant") {
-                    action()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .tint(.orange)
-            }
-        }
-        .padding(.vertical, 2)
-    }
-}
-
-// MARK: - Status Badge
-
-struct StatusBadge: View {
-    let state: AppState.RecordingState
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(color)
-                .frame(width: 6, height: 6)
-            Text(text)
-                .font(.caption)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Capsule().fill(color.opacity(0.15)))
-    }
-
-    private var color: Color {
-        switch state {
-        case .idle: .green
-        case .recording: .red
-        case .transcribing: .orange
-        }
-    }
-
-    private var text: String {
-        switch state {
-        case .idle: "Ready"
-        case .recording: "Recording"
-        case .transcribing: "Processing"
-        }
-    }
-}
+// StatusBadge removed — state is shown via menu bar icon

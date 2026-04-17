@@ -40,8 +40,14 @@ final class AppState {
     var flowBarTheme: String {
         didSet { UserDefaults.standard.set(flowBarTheme, forKey: "flowBarTheme") }
     }
+    var translateToEnglish: Bool {
+        didSet { UserDefaults.standard.set(translateToEnglish, forKey: "translateToEnglish") }
+    }
     var autoPasteEnabled: Bool {
         didSet { UserDefaults.standard.set(autoPasteEnabled, forKey: "autoPasteEnabled") }
+    }
+    var uiLanguage: String {
+        didSet { UserDefaults.standard.set(uiLanguage, forKey: "uiLanguage") }
     }
     var launchAtLogin: Bool {
         didSet {
@@ -113,7 +119,9 @@ final class AppState {
         llmModel = defaults.string(forKey: "llmModel") ?? "qwen2.5:1.5b"
         flowBarEnabled = defaults.object(forKey: "flowBarEnabled") as? Bool ?? true
         flowBarTheme = defaults.string(forKey: "flowBarTheme") ?? "voiceFirst"
+        translateToEnglish = defaults.object(forKey: "translateToEnglish") as? Bool ?? false
         autoPasteEnabled = defaults.object(forKey: "autoPasteEnabled") as? Bool ?? true
+        uiLanguage = defaults.string(forKey: "uiLanguage") ?? "zh"
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
@@ -240,12 +248,14 @@ final class AppState {
         guard let audioData = audioEngine?.stopRecording() else {
             owLog("[OpenWhisper] No audio captured")
             recordingState = .idle
+            hideFlowBarAfterDelay(0.3)
             return
         }
 
         guard audioData.count > 4800 else {
             owLog("[OpenWhisper] Audio too short (\(audioData.count) samples)")
             recordingState = .idle
+            hideFlowBarAfterDelay(0.3)
             return
         }
 
@@ -253,7 +263,8 @@ final class AppState {
             do {
                 var text = try await transcriber?.transcribe(
                     audioData: audioData,
-                    language: language
+                    language: language,
+                    translateToEnglish: translateToEnglish
                 ) ?? ""
 
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -262,6 +273,7 @@ final class AppState {
                       !trimmed.hasPrefix("(BLANK") else {
                     owLog("[OpenWhisper] Empty/blank transcription, skipping")
                     recordingState = .idle
+                    hideFlowBarAfterDelay(0.3)
                     return
                 }
 
@@ -300,12 +312,14 @@ final class AppState {
             }
 
             recordingState = .idle
+            hideFlowBarAfterDelay()
+        }
+    }
 
-            // Hide flow bar after a brief delay (let done animation finish)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                if self?.recordingState == .idle {
-                    self?.flowBarController?.hide()
-                }
+    private func hideFlowBarAfterDelay(_ delay: TimeInterval = 1.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            if self?.recordingState == .idle {
+                self?.flowBarController?.hide()
             }
         }
     }

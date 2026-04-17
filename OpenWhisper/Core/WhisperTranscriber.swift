@@ -55,15 +55,16 @@ final class WhisperTranscriber: @unchecked Sendable {
     }
 
     /// Transcribe 16kHz mono Float32 audio to text
-    func transcribe(audioData: [Float], language: String) async throws -> String {
+    func transcribe(audioData: [Float], language: String, translateToEnglish: Bool = false) async throws -> String {
         guard let whisperKit else {
             throw TranscriberError.modelNotLoaded
         }
 
-        owLog("[Whisper] Transcribing with language='\(language)' task=transcribe samples=\(audioData.count)")
+        let task: DecodingTask = translateToEnglish ? .translate : .transcribe
+        owLog("[Whisper] Transcribing with language='\(language)' task=\(task) samples=\(audioData.count)")
 
         let options = DecodingOptions(
-            task: .transcribe,  // Transcribe in original language, NOT translate to English
+            task: task,
             language: language.isEmpty ? nil : language,
             temperature: 0.0,
             temperatureFallbackCount: 3,
@@ -92,14 +93,51 @@ final class WhisperTranscriber: @unchecked Sendable {
 
         // Filter out Whisper hallucinations on silence/noise
         let hallucinations: Set<String> = [
+            // English
             "Thank you.", "Thanks for watching.", "Subscribe.",
             "you", "You", ".", "", "...", "Thank you for watching.",
             "Bye.", "Bye bye.", "Bye-bye.", "The end.",
             "Thanks.", "Thank you so much.", "See you next time.",
+            "Please subscribe.", "Like and subscribe.",
+            "Thank you for listening.", "Thanks for listening.",
+            "Don't forget to subscribe.", "Hit the like button.",
+            "See you in the next video.", "See you in the next one.",
+            "Please like and subscribe.", "Goodbye.", "Good bye.",
+            // Chinese
+            "谢谢大家", "谢谢观看", "谢谢收看", "谢谢",
+            "一键三连", "点赞", "订阅", "转发",
+            "感谢观看", "感谢收听", "感谢大家",
+            "请订阅", "请点赞", "别忘了点赞",
+            "下次再见", "我们下期再见", "再见",
+            "字幕by", "字幕", "潜水艇字幕",
         ]
         if hallucinations.contains(text) { return "" }
         if text.hasPrefix("[") || text.hasPrefix("(") { return "" }  // [BLANK_AUDIO], (silence), etc.
         if text.count < 3 { return "" }  // Too short to be meaningful
+
+        // Catch longer hallucination patterns (YouTube outros, subtitle credits, repetitive)
+        let hallucinationPatterns = [
+            // Chinese
+            "请不吝", "点赞订阅", "打赏支持", "明镜", "点点栏目",
+            "字幕组", "字幕制作", "翻译校对",
+            "欢迎订阅", "关注我们", "点击订阅",
+            "支持明镜", "请订阅转发",
+            // English
+            "subscribe", "like button", "next video",
+            "don't forget to", "hit the bell",
+            "leave a comment", "share this video",
+        ]
+        let lowerText = text.lowercased()
+        for pattern in hallucinationPatterns {
+            if lowerText.contains(pattern.lowercased()) { return "" }
+        }
+
+        // Detect repetitive hallucinations (same word/phrase repeated)
+        let words = text.components(separatedBy: " ").filter { !$0.isEmpty }
+        if words.count >= 4 {
+            let unique = Set(words)
+            if unique.count <= 2 { return "" }  // e.g. "you you you you"
+        }
 
         return text
     }

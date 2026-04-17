@@ -78,8 +78,11 @@ final class FlowBarController {
             let flowBarView = FlowBarView()
                 .environment(appState)
                 .fixedSize()
+                .padding(16)  // Extra space for shadow rendering
             let hostingView = NSHostingView(rootView: flowBarView)
             hostingView.layer?.backgroundColor = .clear
+            hostingView.wantsLayer = true
+            hostingView.layer?.masksToBounds = false
             panel.contentView = hostingView
 
             // Auto-resize panel to match SwiftUI content

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Murmur Logo — Round 2</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #f0f0f0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 40px; }
+  h1 { text-align: center; font-size: 28px; font-weight: 600; margin-bottom: 6px; }
+  .sub { text-align: center; color: #888; font-size: 13px; margin-bottom: 48px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; max-width: 960px; margin: 0 auto; }
+  .card { background: white; border-radius: 16px; padding: 28px; text-align: center; }
+  .icon-row { display: flex; gap: 16px; justify-content: center; margin-bottom: 14px; }
+  .icon { width: 96px; height: 96px; border-radius: 22px; display: flex; align-items: center; justify-content: center; }
+  .icon svg { width: 56px; height: 56px; }
+  .dark { background: #0a0a0a; }
+  .light { background: #fff; border: 1px solid #ddd; }
+  .label { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .desc { font-size: 11px; color: #999; line-height: 1.5; }
+  .keeper { border: 2px solid #22c55e; }
+</style>
+</head>
+<body>
+
+<h1>Murmur — Logo Round 2</h1>
+<p class="sub">更粗壮的线条 · 更强的视觉质量 · strokeWidth 3-5</p>
+
+<div class="grid">
+
+<!-- 1: Lip Waveform -->
+<div class="card">
+  <div class="icon-row">
+    <div class="icon dark">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <!-- Waveform bars arranged in a lip/mouth curve -->
+        <g fill="white">
+          <rect x="22" y="43" width="7" height="14" rx="3.5"/>
+          <rect x="33" y="36" width="7" height="28" rx="3.5"/>
+          <rect x="44" y="30" width="7" height="40" rx="3.5"/>
+          <rect x="55" y="33" width="7" height="34" rx="3.5"/>
+          <rect x="66" y="38" width="7" height="24" rx="3.5"/>
+          <rect x="77" y="44" width="7" height="12" rx="3.5"/>
+        </g>
+        <!-- Subtle lip curve underneath -->
+        <path d="M20 68 Q35 78 50 78 Q65 78 80 68" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="icon light">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <g fill="black">
+          <rect x="22" y="43" width="7" height="14" rx="3.5"/>
+          <rect x="33" y="36" width="7" height="28" rx="3.5"/>
+          <rect x="44" y="30" width="7" height="40" rx="3.5"/>
+          <rect x="55" y="33" width="7" height="34" rx="3.5"/>
+          <rect x="66" y="38" width="7" height="24" rx="3.5"/>
+          <rect x="77" y="44" width="7" height="12" rx="3.5"/>
+        </g>
+        <path d="M20 68 Q35 78 50 78 Q65 78 80 68" fill="none" stroke="black" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+  <div class="label">1. 唇形波纹</div>
+  <div class="desc">波形柱排列成唇形曲线，底部一道弧线暗示嘴唇。<br>"低语"的具象表达。</div>
+</div>
+
+<!-- 2: Bold Punched Circle -->
+<div class="card">
+  <div class="icon-row">
+    <div class="icon dark">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <mask id="p2d">
+            <rect width="100" height="100" fill="white"/>
+            <rect x="34" y="30" width="7" height="40" rx="3.5" fill="black"/>
+            <rect x="46.5" y="22" width="7" height="56" rx="3.5" fill="black"/>
+            <rect x="59" y="33" width="7" height="34" rx="3.5" fill="black"/>
+          </mask>
+        </defs>
+        <circle cx="50" cy="50" r="36" fill="white" mask="url(#p2d)"/>
+      </svg>
+    </div>
+    <div class="icon light">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <mask id="p2l">
+            <rect width="100" height="100" fill="white"/>
+            <rect x="34" y="30" width="7" height="40" rx="3.5" fill="black"/>
+            <rect x="46.5" y="22" width="7" height="56" rx="3.5" fill="black"/>
+            <rect x="59" y="33" width="7" height="34" rx="3.5" fill="black"/>
+          </mask>
+        </defs>
+        <circle cx="50" cy="50" r="36" fill="black" mask="url(#p2l)"/>
+      </svg>
+    </div>
+  </div>
+  <div class="label">2. 穿孔圆（加粗版）</div>
+  <div class="desc">更大的圆、更粗的槽。实心质量感强，负空间清晰。<br>减法设计的极致。</div>
+</div>
+
+<!-- 3: Bold Wave M -->
+<div class="card">
+  <div class="icon-row">
+    <div class="icon dark">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 72 L18 38 L36 54 L50 24 L64 54 L82 38 L82 72"
+              fill="none" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="icon light">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 72 L18 38 L36 54 L50 24 L64 54 L82 38 L82 72"
+              fill="none" stroke="black" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </div>
+  <div class="label">3. 声波 M（加粗版）</div>
+  <div class="desc">strokeWidth 5，更有力量感。<br>M = Murmur，波形 = 声音。</div>
+</div>
+
+<!-- 4: Solid Bars (kept from round 1, thicker) -->
+<div class="card keeper">
+  <div class="icon-row">
+    <div class="icon dark">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <g fill="white">
+          <rect x="23" y="40" width="8" height="20" rx="4"/>
+          <rect x="36" y="30" width="8" height="40" rx="4"/>
+          <rect x="49" y="22" width="8" height="56" rx="4"/>
+          <rect x="62" y="33" width="8" height="34" rx="4"/>
+          <rect x="75" y="42" width="8" height="16" rx="4"/>
+        </g>
+      </svg>
+    </div>
+    <div class="icon light">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <g fill="black">
+          <rect x="23" y="40" width="8" height="20" rx="4"/>
+          <rect x="36" y="30" width="8" height="40" rx="4"/>
+          <rect x="49" y="22" width="8" height="56" rx="4"/>
+          <rect x="62" y="33" width="8" height="34" rx="4"/>
+          <rect x="75" y="42" width="8" height="16" rx="4"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+  <div class="label">4. 纯波形（加粗版）⭐ 保留</div>
+  <div class="desc">宽 8px，全圆角。更粗更有分量。<br>即是 Logo 也是功能图标。</div>
+</div>
+
+<!-- 5: Mouth Shape -->
+<div class="card">
+  <div class="icon-row">
+    <div class="icon dark">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <!-- Abstract lip shape formed by two arcs -->
+        <path d="M20 50 Q35 30 50 30 Q65 30 80 50" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/>
+        <path d="M20 50 Q35 70 50 70 Q65 70 80 50" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/>
+        <!-- Three sound dots emanating from center -->
+        <circle cx="50" cy="50" r="3" fill="white"/>
+        <circle cx="62" cy="50" r="2.2" fill="white" opacity="0.7"/>
+        <circle cx="72" cy="50" r="1.5" fill="white" opacity="0.4"/>
+      </svg>
+    </div>
+    <div class="icon light">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20 50 Q35 30 50 30 Q65 30 80 50" fill="none" stroke="black" stroke-width="4" stroke-linecap="round"/>
+        <path d="M20 50 Q35 70 50 70 Q65 70 80 50" fill="none" stroke="black" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="50" cy="50" r="3" fill="black"/>
+        <circle cx="62" cy="50" r="2.2" fill="black" opacity="0.7"/>
+        <circle cx="72" cy="50" r="1.5" fill="black" opacity="0.4"/>
+      </svg>
+    </div>
+  </div>
+  <div class="label">5. 唇语</div>
+  <div class="desc">两条弧线构成嘴唇轮廓，中间三个渐弱圆点表示<br>声音在消散。"Murmur"的纯粹意象。</div>
+</div>
+
+<!-- 6: Filled Lip Wave -->
+<div class="card">
+  <div class="icon-row">
+    <div class="icon dark">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <!-- Solid lip shape with waveform cutout -->
+        <defs>
+          <mask id="lip6d">
+            <rect width="100" height="100" fill="white"/>
+            <!-- Wave bars cut into the lip -->
+            <rect x="35" y="38" width="5" height="24" rx="2.5" fill="black"/>
+            <rect x="45" y="34" width="5" height="32" rx="2.5" fill="black"/>
+            <rect x="55" y="37" width="5" height="26" rx="2.5" fill="black"/>
+          </mask>
+        </defs>
+        <path d="M16 50 Q33 24 50 24 Q67 24 84 50 Q67 76 50 76 Q33 76 16 50 Z"
+              fill="white" mask="url(#lip6d)"/>
+      </svg>
+    </div>
+    <div class="icon light">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <mask id="lip6l">
+            <rect width="100" height="100" fill="white"/>
+            <rect x="35" y="38" width="5" height="24" rx="2.5" fill="black"/>
+            <rect x="45" y="34" width="5" height="32" rx="2.5" fill="black"/>
+            <rect x="55" y="37" width="5" height="26" rx="2.5" fill="black"/>
+          </mask>
+        </defs>
+        <path d="M16 50 Q33 24 50 24 Q67 24 84 50 Q67 76 50 76 Q33 76 16 50 Z"
+              fill="black" mask="url(#lip6l)"/>
+      </svg>
+    </div>
+  </div>
+  <div class="label">6. 唇形穿孔</div>
+  <div class="desc">实心唇形（眼形/叶形）上挖出波形槽。<br>穿孔圆的变体，更有品牌辨识度。</div>
+</div>
+
+</div>
+</body>
+</html>

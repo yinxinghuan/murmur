@@ -22,11 +22,7 @@ struct OpenWhisperApp: App {
             SettingsView()
                 .environment(AppState.shared)
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: AppState.shared.menuBarIcon)
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(AppState.shared.menuBarIconColor)
-            }
+            MenuBarIcon(state: AppState.shared.recordingState)
         }
         .menuBarExtraStyle(.window)
     }

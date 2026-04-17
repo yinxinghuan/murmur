@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Murmur Logo — 纯波形对比</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #f0f0f0; font-family: -apple-system, sans-serif; padding: 40px; }
+  h1 { text-align: center; font-size: 24px; margin-bottom: 40px; }
+  .row { display: flex; gap: 24px; justify-content: center; margin-bottom: 32px; }
+  .col { text-align: center; }
+  .label { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .icons { display: flex; gap: 12px; justify-content: center; }
+  .icon { display: flex; align-items: center; justify-content: center; border-radius: 22px; }
+  .icon svg { display: block; }
+  .dark { background: #0a0a0a; }
+  .light { background: #fff; border: 1px solid #ddd; }
+  .gray { background: #808080; }
+  .s128 { width: 128px; height: 128px; }
+  .s128 svg { width: 72px; height: 72px; }
+  .s64 { width: 64px; height: 64px; }
+  .s64 svg { width: 36px; height: 36px; }
+  .s32 { width: 32px; height: 32px; border-radius: 8px; }
+  .s32 svg { width: 18px; height: 18px; }
+  .detail { font-size: 11px; color: #999; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>纯波形 — 粗细对比（5 个档位）</h1>
+
+<!-- Variant A: Original thin (width 5) -->
+<div class="row">
+  <div class="col">
+    <div class="label">A. 细版 (w=5, rx=2.5)</div>
+    <div class="icons">
+      <div class="icon dark s128"><svg viewBox="0 0 100 100"><g fill="white"><rect x="25" y="40" width="5" height="20" rx="2.5"/><rect x="36.25" y="32" width="5" height="36" rx="2.5"/><rect x="47.5" y="25" width="5" height="50" rx="2.5"/><rect x="58.75" y="35" width="5" height="30" rx="2.5"/><rect x="70" y="42" width="5" height="16" rx="2.5"/></g></svg></div>
+      <div class="icon light s128"><svg viewBox="0 0 100 100"><g fill="black"><rect x="25" y="40" width="5" height="20" rx="2.5"/><rect x="36.25" y="32" width="5" height="36" rx="2.5"/><rect x="47.5" y="25" width="5" height="50" rx="2.5"/><rect x="58.75" y="35" width="5" height="30" rx="2.5"/><rect x="70" y="42" width="5" height="16" rx="2.5"/></g></svg></div>
+      <div class="icon gray s128"><svg viewBox="0 0 100 100"><g fill="white"><rect x="25" y="40" width="5" height="20" rx="2.5"/><rect x="36.25" y="32" width="5" height="36" rx="2.5"/><rect x="47.5" y="25" width="5" height="50" rx="2.5"/><rect x="58.75" y="35" width="5" height="30" rx="2.5"/><rect x="70" y="42" width="5" height="16" rx="2.5"/></g></svg></div>
+    </div>
+    <div class="icons" style="margin-top:8px">
+      <div class="icon dark s64"><svg viewBox="0 0 100 100"><g fill="white"><rect x="25" y="40" width="5" height="20" rx="2.5"/><rect x="36.25" y="32" width="5" height="36" rx="2.5"/><rect x="47.5" y="25" width="5" height="50" rx="2.5"/><rect x="58.75" y="35" width="5" height="30" rx="2.5"/><rect x="70" y="42" width="5" height="16" rx="2.5"/></g></svg></div>
+      <div class="icon dark s32"><svg viewBox="0 0 100 100"><g fill="white"><rect x="25" y="40" width="5" height="20" rx="2.5"/><rect x="36.25" y="32" width="5" height="36" rx="2.5"/><rect x="47.5" y="25" width="5" height="50" rx="2.5"/><rect x="58.75" y="35" width="5" height="30" rx="2.5"/><rect x="70" y="42" width="5" height="16" rx="2.5"/></g></svg></div>
+    </div>
+    <div class="detail">间距 6.25 · 占比轻</div>
+  </div>
+</div>
+
+<!-- Variant B: Medium-thin (width 6) -->
+<div class="row">
+  <div class="col">
+    <div class="label">B. 中细 (w=6, rx=3)</div>
+    <div class="icons">
+      <div class="icon dark s128"><svg viewBox="0 0 100 100"><g fill="white"><rect x="24" y="40" width="6" height="20" rx="3"/><rect x="35" y="31" width="6" height="38" rx="3"/><rect x="46" y="24" width="6" height="52" rx="3"/><rect x="57" y="34" width="6" height="32" rx="3"/><rect x="68" y="42" width="6" height="16" rx="3"/></g></svg></div>
+      <div class="icon light s128"><svg viewBox="0 0 100 100"><g fill="black"><rect x="24" y="40" width="6" height="20" rx="3"/><rect x="35" y="31" width="6" height="38" rx="3"/><rect x="46" y="24" width="6" height="52" rx="3"/><rect x="57" y="34" width="6" height="32" rx="3"/><rect x="68" y="42" width="6" height="16" rx="3"/></g></svg></div>
+      <div class="icon gray s128"><svg viewBox="0 0 100 100"><g fill="white"><rect x="24" y="40" width="6" height="20" rx="3"/><rect x="35" y="31" width="6" height="38" rx="3"/><rect x="46" y="24" width="6" height="52" rx="3"/><rect x="57" y="34" width="6" height="32" rx="3"/><rect x="68" y="42" width="6" height="16" rx="3"/></g></svg></div>
+    </div>
+    <div class="icons" style="margin-top:8px">
+      <div class="icon dark s64"><svg viewBox="0 0 100 100"><g fill="white"><rect x="24" y="40" width="6" height="20" rx="3"/><rect x="35" y="31" width="6" height="38" rx="3"/><rect x="46" y="24" width="6" height="52" rx="3"/><rect x="57" y="34" width="6" height="32" rx="3"/><rect x="68" y="42" width="6" height="16" rx="3"/></g></svg></div>
+      <div class="icon dark s32"><svg viewBox="0 0 100 100"><g fill="white"><rect x="24" y="40" width="6" height="20" rx="3"/><rect x="35" y="31" width="6" height="38" rx="3"/><rect x="46" y="24" width="6" height="52" rx="3"/><rect x="57" y="34" width="6" height="32" rx="3"/><rect x="68" y="42" width="6" height="16" rx="3"/></g></svg></div>
+    </div>
+    <div class="detail">间距 5 · 均衡</div>
+  </div>
+</div>
+
+<!-- Variant C: Medium (width 7) -->
+<div class="row">
+  <div class="col">
+    <div class="label">C. 中等 (w=7, rx=3.5)</div>
+    <div class="icons">
+      <div class="icon dark s128"><svg viewBox="0 0 100 100"><g fill="white"><rect x="22" y="40" width="7" height="20" rx="3.5"/><rect x="33.5" y="31" width="7" height="38" rx="3.5"/><rect x="45" y="23" width="7" height="54" rx="3.5"/><rect x="56.5" y="34" width="7" height="32" rx="3.5"/><rect x="68" y="42" width="7" height="16" rx="3.5"/></g></svg></div>
+      <div class="icon light s128"><svg viewBox="0 0 100 100"><g fill="black"><rect x="22" y="40" width="7" height="20" rx="3.5"/><rect x="33.5" y="31" width="7" height="38" rx="3.5"/><rect x="45" y="23" width="7" height="54" rx="3.5"/><rect x="56.5" y="34" width="7" height="32" rx="3.5"/><rect x="68" y="42" width="7" height="16" rx="3.5"/></g></svg></div>
+      <div class="icon gray s128"><svg viewBox="0 0 100 100"><g fill="white"><rect x="22" y="40" width="7" height="20" rx="3.5"/><rect x="33.5" y="31" width="7" height="38" rx="3.5"/><rect x="45" y="23" width="7" height="54" rx="3.5"/><rect x="56.5" y="34" width="7" height="32" rx="3.5"/><rect x="68" y="42" width="7" height="16" rx="3.5"/></g></svg></div>
+    </div>
+    <div class="icons" style="margin-top:8px">
+      <div class="icon dark s64"><svg viewBox="0 0 100 100"><g fill="white"><rect x="22" y="40" width="7" height="20" rx="3.5"/><rect x="33.5" y="31" width="7" height="38" rx="3.5"/><rect x="45" y="23" width="7" height="54" rx="3.5"/><rect x="56.5" y="34" width="7" height="32" rx="3.5"/><rect x="68" y="42" width="7" height="16" rx="3.5"/></g></svg></div>
+      <div class="icon dark s32"><svg viewBox="0 0 100 100"><g fill="white"><rect x="22" y="40" width="7" height="20" rx="3.5"/><rect x="33.5" y="31" width="7" height="38" rx="3.5"/><rect x="45" y="23" width="7" height="54" rx="3.5"/><rect x="56.5" y="34" width="7" height="32" rx="3.5"/><rect x="68" y="42" width="7" height="16" rx="3.5"/></g></svg></div>
+    </div>
+    <div class="detail">间距 4.5 · 适中</div>
+  </div>
+</div>
+
+<!-- Variant D: Medium-bold (width 8) -->
+<div class="row">
+  <div class="col">
+    <div class="label">D. 中粗 (w=8, rx=4)</div>
+    <div class="icons">
+      <div class="icon dark s128"><svg viewBox="0 0 100 100"><g fill="white"><rect x="23" y="40" width="8" height="20" rx="4"/><rect x="34.5" y="30" width="8" height="40" rx="4"/><rect x="46" y="22" width="8" height="56" rx="4"/><rect x="57.5" y="33" width="8" height="34" rx="4"/><rect x="69" y="42" width="8" height="16" rx="4"/></g></svg></div>
+      <div class="icon light s128"><svg viewBox="0 0 100 100"><g fill="black"><rect x="23" y="40" width="8" height="20" rx="4"/><rect x="34.5" y="30" width="8" height="40" rx="4"/><rect x="46" y="22" width="8" height="56" rx="4"/><rect x="57.5" y="33" width="8" height="34" rx="4"/><rect x="69" y="42" width="8" height="16" rx="4"/></g></svg></div>
+      <div class="icon gray s128"><svg viewBox="0 0 100 100"><g fill="white"><rect x="23" y="40" width="8" height="20" rx="4"/><rect x="34.5" y="30" width="8" height="40" rx="4"/><rect x="46" y="22" width="8" height="56" rx="4"/><rect x="57.5" y="33" width="8" height="34" rx="4"/><rect x="69" y="42" width="8" height="16" rx="4"/></g></svg></div>
+    </div>
+    <div class="icons" style="margin-top:8px">
+      <div class="icon dark s64"><svg viewBox="0 0 100 100"><g fill="white"><rect x="23" y="40" width="8" height="20" rx="4"/><rect x="34.5" y="30" width="8" height="40" rx="4"/><rect x="46" y="22" width="8" height="56" rx="4"/><rect x="57.5" y="33" width="8" height="34" rx="4"/><rect x="69" y="42" width="8" height="16" rx="4"/></g></svg></div>
+      <div class="icon dark s32"><svg viewBox="0 0 100 100"><g fill="white"><rect x="23" y="40" width="8" height="20" rx="4"/><rect x="34.5" y="30" width="8" height="40" rx="4"/><rect x="46" y="22" width="8" height="56" rx="4"/><rect x="57.5" y="33" width="8" height="34" rx="4"/><rect x="69" y="42" width="8" height="16" rx="4"/></g></svg></div>
+    </div>
+    <div class="detail">间距 3.5 · 饱满</div>
+  </div>
+</div>
+
+<!-- Variant E: Bold (width 10) -->
+<div class="row">
+  <div class="col">
+    <div class="label">E. 粗版 (w=10, rx=5)</div>
+    <div class="icons">
+      <div class="icon dark s128"><svg viewBox="0 0 100 100"><g fill="white"><rect x="20" y="40" width="10" height="20" rx="5"/><rect x="33" y="29" width="10" height="42" rx="5"/><rect x="46" y="21" width="10" height="58" rx="5"/><rect x="59" y="32" width="10" height="36" rx="5"/><rect x="72" y="42" width="10" height="16" rx="5"/></g></svg></div>
+      <div class="icon light s128"><svg viewBox="0 0 100 100"><g fill="black"><rect x="20" y="40" width="10" height="20" rx="5"/><rect x="33" y="29" width="10" height="42" rx="5"/><rect x="46" y="21" width="10" height="58" rx="5"/><rect x="59" y="32" width="10" height="36" rx="5"/><rect x="72" y="42" width="10" height="16" rx="5"/></g></svg></div>
+      <div class="icon gray s128"><svg viewBox="0 0 100 100"><g fill="white"><rect x="20" y="40" width="10" height="20" rx="5"/><rect x="33" y="29" width="10" height="42" rx="5"/><rect x="46" y="21" width="10" height="58" rx="5"/><rect x="59" y="32" width="10" height="36" rx="5"/><rect x="72" y="42" width="10" height="16" rx="5"/></g></svg></div>
+    </div>
+    <div class="icons" style="margin-top:8px">
+      <div class="icon dark s64"><svg viewBox="0 0 100 100"><g fill="white"><rect x="20" y="40" width="10" height="20" rx="5"/><rect x="33" y="29" width="10" height="42" rx="5"/><rect x="46" y="21" width="10" height="58" rx="5"/><rect x="59" y="32" width="10" height="36" rx="5"/><rect x="72" y="42" width="10" height="16" rx="5"/></g></svg></div>
+      <div class="icon dark s32"><svg viewBox="0 0 100 100"><g fill="white"><rect x="20" y="40" width="10" height="20" rx="5"/><rect x="33" y="29" width="10" height="42" rx="5"/><rect x="46" y="21" width="10" height="58" rx="5"/><rect x="59" y="32" width="10" height="36" rx="5"/><rect x="72" y="42" width="10" height="16" rx="5"/></g></svg></div>
+    </div>
+    <div class="detail">间距 3 · 厚重</div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
