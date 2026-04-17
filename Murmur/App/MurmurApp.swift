@@ -22,7 +22,7 @@ struct MurmurApp: App {
             SettingsView()
                 .environment(AppState.shared)
         } label: {
-            MenuBarIcon(state: AppState.shared.recordingState)
+            Image(systemName: AppState.shared.recordingState == .recording ? "waveform.circle.fill" : "waveform")
         }
         .menuBarExtraStyle(.window)
     }
