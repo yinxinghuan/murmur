@@ -210,40 +210,18 @@ struct SettingsView: View {
             }
 
             if showAdvanced {
-                // Voice commands
-                row(zh ? "语音指令" : "Voice Cmd", icon: "mic.badge.plus") {
-                    Toggle("", isOn: $appState.voiceCommandsEnabled)
-                        .toggleStyle(.switch).labelsHidden().controlSize(.mini)
-                        .frame(width: R, alignment: .trailing)
-                }
-                if appState.voiceCommandsEnabled {
-                    Text(zh ? "在语音末尾说指令来控制键盘操作" : "Say a command at end of speech")
-                        .font(.caption).foregroundStyle(.tertiary)
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(zh ? "\"换行\" → ↵" : "\"new line\" → ↵").font(.caption2)
-                            Text(zh ? "\"发送\" → ↵" : "\"send\" → ↵").font(.caption2)
-                            Text(zh ? "\"删除\" → ⌫" : "\"delete\" → ⌫").font(.caption2)
-                        }
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(zh ? "\"撤销\" → ⌘Z" : "\"undo\" → ⌘Z").font(.caption2)
-                            Text(zh ? "\"全选\" → ⌘A" : "\"select all\" → ⌘A").font(.caption2)
-                        }
-                    }
-                    .foregroundStyle(.tertiary).padding(.leading, 12)
-                }
-
                 // Protected terms (only when LLM is on)
                 if appState.llmCleanupEnabled {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(zh ? "保护术语（逗号分隔）" : "Protected terms (comma separated)")
-                            .font(.caption).foregroundStyle(.secondary)
-                        TextField(zh ? "如: useState, API" : "e.g. useState, API", text: $appState.customTerms)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 12, design: .monospaced))
-                        Text(zh ? "文本润色时保持这些术语不被修改" : "Keep these terms unchanged during text polish")
-                            .font(.caption).foregroundStyle(.tertiary)
+                    row(zh ? "术语保护" : "Term Guard", icon: "shield") {
+                        Text(appState.protectedTerms.isEmpty
+                             ? (zh ? "未设置" : "None")
+                             : "\(appState.protectedTerms.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: R, alignment: .trailing)
                     }
+                    ProtectedTermsView(terms: $appState.protectedTerms, zh: zh)
+                        .padding(.leading, 12)
                 }
             }
 
@@ -253,7 +231,7 @@ struct SettingsView: View {
             HStack {
                 Label(zh ? "退出 Murmur" : "Quit Murmur", systemImage: "xmark.circle")
                 Spacer()
-                Text("v1.2.0").font(.caption).foregroundStyle(.tertiary)
+                Text("v1.4.0").font(.caption).foregroundStyle(.tertiary)
             }
             .onTapGesture { NSApplication.shared.terminate(nil) }
         }

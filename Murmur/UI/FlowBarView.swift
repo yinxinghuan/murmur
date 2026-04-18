@@ -57,13 +57,17 @@ struct MinimalFlowBar: View {
                     .font(.system(size: 13, weight: .medium, design: .monospaced))
                     .foregroundStyle(.white)
                     .monospacedDigit()
+                CancelButton(color: .white) { appState.cancelRecording() }
             }
             .opacity(state == .recording ? 1 : 0)
 
             // Transcribing
-            ShimmerBar(color: .white)
-                .frame(width: 48)
-                .opacity(state == .transcribing ? 1 : 0)
+            HStack(spacing: 12) {
+                ShimmerBar(color: .white)
+                    .frame(width: 80)
+                CancelButton(color: .white) { appState.cancelRecording() }
+            }
+            .opacity(state == .transcribing ? 1 : 0)
 
             // Done
             Image(systemName: "checkmark")
@@ -72,7 +76,8 @@ struct MinimalFlowBar: View {
                 .opacity(state == .done ? 1 : 0)
         }
         .frame(height: 20)
-        .padding(.horizontal, 18)
+        .padding(.leading, 18)
+        .padding(.trailing, 12)
         .padding(.vertical, 9)
         .background(Capsule().fill(.black))
         .onAppear {
@@ -190,12 +195,16 @@ struct InvertFlowBar: View {
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.black)
                     .monospacedDigit()
+                CancelButton(color: .black) { appState.cancelRecording() }
             }
             .opacity(state == .recording ? 1 : 0)
 
-            ShimmerBar(color: .black)
-                .frame(width: 48)
-                .opacity(state == .transcribing ? 1 : 0)
+            HStack(spacing: 12) {
+                ShimmerBar(color: .black)
+                    .frame(width: 80)
+                CancelButton(color: .black) { appState.cancelRecording() }
+            }
+            .opacity(state == .transcribing ? 1 : 0)
 
             Image(systemName: "checkmark")
                 .font(.system(size: 13, weight: .bold))
@@ -203,7 +212,8 @@ struct InvertFlowBar: View {
                 .opacity(state == .done ? 1 : 0)
         }
         .frame(height: 20)
-        .padding(.horizontal, 18)
+        .padding(.leading, 18)
+        .padding(.trailing, 12)
         .padding(.vertical, 9)
         .background(
             Capsule()
@@ -294,31 +304,49 @@ struct ThreeDots: View {
 
 struct ShimmerBar: View {
     var color: Color = .white
-    @State private var phase: CGFloat = -0.5
+    @State private var phase: CGFloat = -0.6
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 1.5)
+        RoundedRectangle(cornerRadius: 2)
             .fill(color.opacity(0.15))
-            .frame(height: 3)
+            .frame(height: 4)
             .overlay(
                 GeometryReader { geo in
-                    RoundedRectangle(cornerRadius: 1.5)
+                    RoundedRectangle(cornerRadius: 2)
                         .fill(
                             LinearGradient(
-                                colors: [color.opacity(0), color.opacity(0.6), color.opacity(0)],
+                                colors: [color.opacity(0), color.opacity(0.55), color.opacity(0)],
                                 startPoint: .leading, endPoint: .trailing
                             )
                         )
-                        .frame(width: geo.size.width * 0.35)
+                        .frame(width: geo.size.width * 0.45)
                         .offset(x: phase * geo.size.width)
                 }
                 .clipped()
             )
             .onAppear {
-                withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: false)) {
+                withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: false)) {
                     phase = 1.2
                 }
             }
+    }
+}
+
+// MARK: - Cancel Button
+
+struct CancelButton: View {
+    var color: Color = .white
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(color.opacity(0.5))
+                .frame(width: 16, height: 16)
+                .background(Circle().fill(color.opacity(0.12)))
+        }
+        .buttonStyle(.plain)
     }
 }
 

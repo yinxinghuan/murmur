@@ -11,10 +11,12 @@ final class GlobalHotkey {
 
     private let onPress: () -> Void
     private let onRelease: () -> Void
+    private let onCancel: () -> Void
 
-    init(onPress: @escaping () -> Void, onRelease: @escaping () -> Void) {
+    init(onPress: @escaping () -> Void, onRelease: @escaping () -> Void, onCancel: @escaping () -> Void) {
         self.onPress = onPress
         self.onRelease = onRelease
+        self.onCancel = onCancel
     }
 
     /// Check and optionally prompt for Accessibility permissions.
@@ -53,16 +55,24 @@ final class GlobalHotkey {
         return false
     }
 
-    /// Register global and local key monitors for Right Option hold-to-talk
+    /// Register global and local key monitors for Right Option hold-to-talk + Esc cancel
     func register() {
         // Monitor events in other applications
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            self?.handleFlagsChanged(event)
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { [weak self] event in
+            if event.type == .flagsChanged {
+                self?.handleFlagsChanged(event)
+            } else if event.type == .keyDown {
+                self?.handleKeyDown(event)
+            }
         }
 
         // Monitor events in our own app
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            self?.handleFlagsChanged(event)
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { [weak self] event in
+            if event.type == .flagsChanged {
+                self?.handleFlagsChanged(event)
+            } else if event.type == .keyDown {
+                self?.handleKeyDown(event)
+            }
             return event
         }
     }
@@ -75,6 +85,13 @@ final class GlobalHotkey {
         if let localMonitor {
             NSEvent.removeMonitor(localMonitor)
             self.localMonitor = nil
+        }
+    }
+
+    // Esc key = keyCode 53
+    private func handleKeyDown(_ event: NSEvent) {
+        if event.keyCode == 53 {
+            onCancel()
         }
     }
 
