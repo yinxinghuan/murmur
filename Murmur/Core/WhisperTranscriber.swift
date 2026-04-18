@@ -205,6 +205,20 @@ final class WhisperTranscriber: @unchecked Sendable {
         let empty = TranscribeResult(text: "", detectedLanguage: detectedLang)
         if hallucinations.contains(text) { return empty }
         if text.hasPrefix("[") || text.hasPrefix("(") { return empty }
+
+        // Amara.org subtitles hallucination (often appended to real text)
+        let amaraPatterns = ["amara.org", "subtitles by", "字幕由"]
+        let lowerForAmara = text.lowercased()
+        for p in amaraPatterns {
+            if lowerForAmara.contains(p) {
+                let cleaned = text.replacingOccurrences(
+                    of: "\\s*Subtitles by the Amara\\.org[e]? community\\.?",
+                    with: "", options: .regularExpression
+                ).trimmingCharacters(in: .whitespacesAndNewlines)
+                if cleaned.isEmpty { return empty }
+                return TranscribeResult(text: cleaned, detectedLanguage: detectedLang)
+            }
+        }
         if text.count < 3 { return empty }
 
         let hallucinationPatterns = [

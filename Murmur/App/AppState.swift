@@ -26,7 +26,12 @@ final class AppState {
         didSet { UserDefaults.standard.set(whisperModel, forKey: "whisperModel") }
     }
     var language: String {
-        didSet { UserDefaults.standard.set(language, forKey: "language") }
+        didSet {
+            UserDefaults.standard.set(language, forKey: "language")
+            // CoreML may need to recompile when DecodingOptions change;
+            // mark as "first run" so next transcription gets retry protection
+            isFirstTranscriptionDone = false
+        }
     }
     var llmCleanupEnabled: Bool {
         didSet { UserDefaults.standard.set(llmCleanupEnabled, forKey: "llmCleanupEnabled") }
@@ -50,7 +55,10 @@ final class AppState {
         didSet { UserDefaults.standard.set(flowBarTheme, forKey: "flowBarTheme") }
     }
     var translateToEnglish: Bool {
-        didSet { UserDefaults.standard.set(translateToEnglish, forKey: "translateToEnglish") }
+        didSet {
+            UserDefaults.standard.set(translateToEnglish, forKey: "translateToEnglish")
+            isFirstTranscriptionDone = false
+        }
     }
     // "auto" = no conversion, "simplified" = 繁→简, "traditional" = 简→繁
     var chineseVariant: String {
@@ -150,7 +158,17 @@ final class AppState {
     init() {
         let defaults = UserDefaults.standard
         whisperModel = defaults.string(forKey: "whisperModel") ?? "small"
-        language = defaults.string(forKey: "language") ?? "zh"
+        // Default language follows system locale (zh/en/ja/ko/etc.), fallback to "zh"
+        let systemDefault: String = {
+            guard let preferred = Locale.preferredLanguages.first else { return "zh" }
+            let code = String(preferred.prefix(2))
+            // Only use system language if Whisper supports it well
+            let supported = ["zh", "en", "ja", "ko", "fr", "de", "es", "ru", "pt", "it",
+                             "nl", "pl", "sv", "da", "fi", "no", "tr", "ar", "hi", "th",
+                             "vi", "id", "ms", "uk", "cs", "ro", "hu", "el", "he"]
+            return supported.contains(code) ? code : "zh"
+        }()
+        language = defaults.string(forKey: "language") ?? systemDefault
         llmCleanupEnabled = defaults.object(forKey: "llmCleanupEnabled") as? Bool ?? true
         // Migrate old comma-separated customTerms to new array format
         if let oldTerms = defaults.string(forKey: "customTerms"), !oldTerms.isEmpty {
@@ -452,23 +470,48 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
                 )
                 var text = result?.text ?? ""
 
-                // Auto-retry on first transcription only:
-                // CoreML first-run often produces all-English regardless of language setting.
+                // Auto-retry when language mismatch detected.
+                // Whisper/CoreML can produce all-English output even when input is Chinese:
+                //   1. First-run after model load: CoreML compile causes unreliable results
+                //   2. Auto mode: Whisper misdetects Chinese as English
+                //   3. Explicit zh mode: CoreML occasionally glitches after option changes
                 // Only retry when output has ZERO Chinese characters (pure English),
                 // so mixed Chinese-English input is preserved as-is.
-                if !isFirstTranscriptionDone && !language.isEmpty && language != "en" && !translateToEnglish {
-                    let hasChinese = text.unicodeScalars.contains { $0.value >= 0x4E00 && $0.value <= 0x9FFF }
-                    if !text.isEmpty && !hasChinese {
-                        owLog("[Murmur] First-run language mismatch (all English, expected=\(language)), retrying after delay...")
-                        // Wait for CoreML to finish compiling before retry
-                        try? await Task.sleep(nanoseconds: 800_000_000)
-                        result = try await transcriber?.transcribe(
-                            audioData: audioData,
-                            language: language,
-                            translateToEnglish: false
-                        )
-                        text = result?.text ?? ""
-                        owLog("[Murmur] Retry result: \(text)")
+                if language != "en" && !translateToEnglish && !text.isEmpty {
+                    // Check Chinese character ratio — not just presence.
+                    // Whisper sometimes translates Chinese to English but leaves a few
+                    // stray CJK chars (e.g. "Run色"), so a single char shouldn't count.
+                    let totalChars = text.unicodeScalars.filter(\.properties.isAlphabetic).count
+                    let chineseCount = text.unicodeScalars.filter { $0.value >= 0x4E00 && $0.value <= 0x9FFF }.count
+                    let chineseRatio = totalChars > 0 ? Double(chineseCount) / Double(totalChars) : 0
+                    let isMostlyEnglish = chineseRatio < 0.3
+                    if isMostlyEnglish {
+                        let retryLang: String?
+                        if !isFirstTranscriptionDone {
+                            // First-run: always retry (CoreML compile issue)
+                            retryLang = language.isEmpty ? "zh" : language
+                        } else if language.isEmpty {
+                            // Auto mode: retry if system locale is Chinese
+                            let systemIsChinese = Locale.preferredLanguages.first?.hasPrefix("zh") == true
+                            retryLang = systemIsChinese ? "zh" : nil
+                        } else {
+                            // Explicit non-en language but got all-English: retry
+                            retryLang = language
+                        }
+
+                        if let retryLang {
+                            owLog("[Murmur] Language mismatch (all English, retrying with lang=\(retryLang), firstRun=\(!isFirstTranscriptionDone))...")
+                            if !isFirstTranscriptionDone {
+                                try? await Task.sleep(nanoseconds: 800_000_000)
+                            }
+                            result = try await transcriber?.transcribe(
+                                audioData: audioData,
+                                language: retryLang,
+                                translateToEnglish: false
+                            )
+                            text = result?.text ?? ""
+                            owLog("[Murmur] Retry result: \(text)")
+                        }
                     }
                 }
                 isFirstTranscriptionDone = true
@@ -649,7 +692,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     // MARK: - Update Check
 
-    static let currentVersion = "1.5.0"
+    static let currentVersion = "1.5.1"
 
     func checkForUpdate() async {
         guard let url = URL(string: "https://api.github.com/repos/yinxinghuan/murmur/releases/latest") else { return }
