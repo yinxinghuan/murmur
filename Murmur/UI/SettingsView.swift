@@ -231,7 +231,7 @@ struct SettingsView: View {
             HStack {
                 Label(zh ? "退出 Murmur" : "Quit Murmur", systemImage: "xmark.circle")
                 Spacer()
-                Text("v1.4.0").font(.caption).foregroundStyle(.tertiary)
+                Text("v1.4.1").font(.caption).foregroundStyle(.tertiary)
             }
             .onTapGesture { NSApplication.shared.terminate(nil) }
         }

@@ -142,8 +142,13 @@ final class WhisperTranscriber: @unchecked Sendable {
         removeOtherModels(keeping: name, in: modelBase)
     }
 
+    struct TranscribeResult {
+        let text: String
+        let detectedLanguage: String
+    }
+
     /// Transcribe audio
-    func transcribe(audioData: [Float], language: String, translateToEnglish: Bool = false) async throws -> String {
+    func transcribe(audioData: [Float], language: String, translateToEnglish: Bool = false) async throws -> TranscribeResult {
         guard let whisperKit else {
             throw TranscriberError.modelNotLoaded
         }
@@ -169,6 +174,7 @@ final class WhisperTranscriber: @unchecked Sendable {
             decodeOptions: options
         )
 
+        let detectedLang = results.first?.language ?? ""
         for (i, result) in results.enumerated() {
             owLog("[Whisper] Result[\(i)] language=\(result.language) text=\(result.text)")
         }
@@ -196,9 +202,10 @@ final class WhisperTranscriber: @unchecked Sendable {
             "下次再见", "我们下期再见", "再见",
             "字幕by", "字幕", "潜水艇字幕",
         ]
-        if hallucinations.contains(text) { return "" }
-        if text.hasPrefix("[") || text.hasPrefix("(") { return "" }
-        if text.count < 3 { return "" }
+        let empty = TranscribeResult(text: "", detectedLanguage: detectedLang)
+        if hallucinations.contains(text) { return empty }
+        if text.hasPrefix("[") || text.hasPrefix("(") { return empty }
+        if text.count < 3 { return empty }
 
         let hallucinationPatterns = [
             "请不吝", "点赞订阅", "打赏支持", "明镜", "点点栏目",
@@ -212,16 +219,16 @@ final class WhisperTranscriber: @unchecked Sendable {
         ]
         let lowerText = text.lowercased()
         for pattern in hallucinationPatterns {
-            if lowerText.contains(pattern.lowercased()) { return "" }
+            if lowerText.contains(pattern.lowercased()) { return empty }
         }
 
         let words = text.components(separatedBy: " ").filter { !$0.isEmpty }
         if words.count >= 4 {
             let unique = Set(words)
-            if unique.count <= 2 { return "" }
+            if unique.count <= 2 { return empty }
         }
 
-        return text
+        return TranscribeResult(text: text, detectedLanguage: detectedLang)
     }
 
     /// Keep only the 2 most recent models on disk

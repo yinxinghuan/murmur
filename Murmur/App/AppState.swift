@@ -255,6 +255,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
     func loadModel() async {
         modelLoaded = false
         modelLoading = true
+        isFirstTranscriptionDone = false
         modelLoadProgress = 0
         lastError = nil
         failedModelName = nil
@@ -427,11 +428,35 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
         transcriptionTask = Task {
             do {
-                var text = try await transcriber?.transcribe(
+                // Transcribe, with one automatic retry on language mismatch
+                // (first run after model load often produces English regardless of language setting)
+                var result = try await transcriber?.transcribe(
                     audioData: audioData,
                     language: language,
                     translateToEnglish: translateToEnglish
-                ) ?? ""
+                )
+                var text = result?.text ?? ""
+
+                // Auto-retry on first transcription only:
+                // CoreML first-run often produces all-English regardless of language setting.
+                // Only retry when output has ZERO Chinese characters (pure English),
+                // so mixed Chinese-English input is preserved as-is.
+                if !isFirstTranscriptionDone && !language.isEmpty && language != "en" && !translateToEnglish {
+                    let hasChinese = text.unicodeScalars.contains { $0.value >= 0x4E00 && $0.value <= 0x9FFF }
+                    if !text.isEmpty && !hasChinese {
+                        owLog("[Murmur] First-run language mismatch (all English, expected=\(language)), retrying after delay...")
+                        // Wait for CoreML to finish compiling before retry
+                        try? await Task.sleep(nanoseconds: 800_000_000)
+                        result = try await transcriber?.transcribe(
+                            audioData: audioData,
+                            language: language,
+                            translateToEnglish: false
+                        )
+                        text = result?.text ?? ""
+                        owLog("[Murmur] Retry result: \(text)")
+                    }
+                }
+                isFirstTranscriptionDone = true
 
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty,
@@ -444,25 +469,6 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
                 }
 
                 owLog("[Murmur] Raw: \(text)")
-
-                // Language mismatch detection: if user set Chinese but output is all ASCII,
-                // discard and notify user to try again (common on first run after model load)
-                if language == "zh" && !translateToEnglish {
-                    let chineseChars = text.unicodeScalars.filter { $0.value > 0x4E00 && $0.value < 0x9FFF }.count
-                    if chineseChars == 0 && text.count > 3 {
-                        owLog("[Murmur] Language mismatch: expected Chinese but got all non-Chinese, skipping")
-                        playSound("Basso", volume: 0.2)
-                        sendNotification(
-                            title: "Murmur",
-                            body: uiLanguage == "zh"
-                                ? "语言识别异常，请再试一次"
-                                : "Language mismatch, please try again"
-                        )
-                        recordingState = .idle
-                        hideFlowBarAfterDelay(0.3)
-                        return
-                    }
-                }
 
                 // Chinese variant conversion (zero-cost, no LLM needed)
                 if (language == "zh" || language == "") && chineseVariant != "auto" {
@@ -511,6 +517,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
     // MARK: - Cancel
 
     private var transcriptionTask: Task<Void, Never>?
+    private var isFirstTranscriptionDone = false
 
     func cancelRecording() {
         guard recordingState != .idle else { return }

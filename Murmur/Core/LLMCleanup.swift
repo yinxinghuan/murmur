@@ -9,8 +9,9 @@ final class LLMCleanup: Sendable {
         - Fix grammar, spelling, and punctuation
         - Keep the EXACT meaning and tone — do NOT rephrase or add words
         - If it's code-related, preserve technical terms, variable names, function names exactly
-        - For Chinese text: fix punctuation (use 。，！？ etc.), do NOT translate to English
+        - NEVER translate. If input is Chinese, output MUST be Chinese. If input is English, output MUST be English.
         - For mixed Chinese-English text: keep each part in its original language
+        - For Chinese text: use Chinese punctuation (。，！？)
         - Output ONLY the cleaned text, nothing else
         - Do NOT add quotes around the output
         """
@@ -72,10 +73,18 @@ final class LLMCleanup: Sendable {
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                     .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
 
-                // Sanity check: don't return empty or much longer than input
-                if !cleaned.isEmpty && cleaned.count < text.count * 3 {
-                    return cleaned
+                // Sanity checks
+                guard !cleaned.isEmpty && cleaned.count < text.count * 3 else { return text }
+
+                // Language guard: if input has Chinese but output lost it, LLM translated — discard
+                let inputHasChinese = text.unicodeScalars.contains { $0.value >= 0x4E00 && $0.value <= 0x9FFF }
+                let outputHasChinese = cleaned.unicodeScalars.contains { $0.value >= 0x4E00 && $0.value <= 0x9FFF }
+                if inputHasChinese && !outputHasChinese {
+                    owLog("[LLM] Discarded: LLM translated Chinese to English")
+                    return text
                 }
+
+                return cleaned
             }
         } catch {
             // Silently fall back to raw text
