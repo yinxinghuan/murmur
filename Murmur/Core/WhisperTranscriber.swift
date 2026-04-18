@@ -219,7 +219,10 @@ final class WhisperTranscriber: @unchecked Sendable {
                 return TranscribeResult(text: cleaned, detectedLanguage: detectedLang)
             }
         }
-        if text.count < 3 { return empty }
+        // Min length: CJK characters carry more meaning per char than Latin
+        let hasCJK = text.unicodeScalars.contains { $0.value >= 0x4E00 && $0.value <= 0x9FFF }
+        let minLen = hasCJK ? 1 : 3
+        if text.count < minLen { return empty }
 
         let hallucinationPatterns = [
             "请不吝", "点赞订阅", "打赏支持", "明镜", "点点栏目",
