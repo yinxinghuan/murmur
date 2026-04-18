@@ -286,51 +286,74 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
     var failedModelName: String?  // Non-nil when a model failed and needs user action
 
     func loadModel() async {
+        // Cancel any in-progress model load/download
+        modelLoadTask?.cancel()
+
+        let targetModel = whisperModel
         modelLoaded = false
         modelLoading = true
         isFirstTranscriptionDone = false
         modelLoadProgress = 0
         lastError = nil
         failedModelName = nil
-        let wasDownloading = !(transcriber?.isModelDownloaded(name: whisperModel) ?? false)
+        let wasDownloading = !(transcriber?.isModelDownloaded(name: targetModel) ?? false)
         modelIsDownloading = wasDownloading
-        owLog("[Murmur] Loading model: \(whisperModel) (download needed: \(wasDownloading))...")
-        do {
-            try await transcriber?.loadModel(name: whisperModel) { [weak self] progress in
-                Task { @MainActor in
-                    self?.modelLoadProgress = progress
+        owLog("[Murmur] Loading model: \(targetModel) (download needed: \(wasDownloading))...")
+
+        let task = Task {
+            do {
+                try Task.checkCancellation()
+                try await transcriber?.loadModel(name: targetModel) { [weak self] progress in
+                    Task { @MainActor in
+                        // Only update progress if this model is still the target
+                        guard self?.whisperModel == targetModel else { return }
+                        self?.modelLoadProgress = progress
+                    }
                 }
+                try Task.checkCancellation()
+
+                // Verify we're still loading this model (user may have switched)
+                guard whisperModel == targetModel else {
+                    owLog("[Murmur] Model \(targetModel) loaded but user switched away, ignoring")
+                    return
+                }
+
+                modelLoaded = true
+                modelLoading = false
+                lastError = nil
+                refreshDownloadedModels()
+                owLog("[Murmur] Model loaded: \(targetModel)")
+
+                // Notify user if they're not looking at the menu
+                if wasDownloading {
+                    sendNotification(
+                        title: "Murmur",
+                        body: uiLanguage == "zh"
+                            ? "模型 \(targetModel) 已就绪，可以开始使用"
+                            : "Model \(targetModel) is ready to use"
+                    )
+                    playSound("Glass", volume: 0.2)
+                }
+            } catch is CancellationError {
+                owLog("[Murmur] Model load cancelled: \(targetModel)")
+            } catch {
+                // Only handle error if this model is still the target
+                guard whisperModel == targetModel else { return }
+                owLog("[Murmur] Model load failed: \(error)")
+                modelLoading = false
+
+                // Delete the broken model
+                transcriber?.deleteModel(name: targetModel)
+                refreshDownloadedModels()
+
+                // Don't auto-fallback — let user decide
+                failedModelName = targetModel
+                lastError = uiLanguage == "zh"
+                    ? "\(targetModel) 下载不完整或已损坏"
+                    : "\(targetModel) is incomplete or corrupted"
             }
-            modelLoaded = true
-            modelLoading = false
-            lastError = nil
-            refreshDownloadedModels()
-            owLog("[Murmur] Model loaded: \(modelLoaded)")
-
-            // Notify user if they're not looking at the menu
-            if wasDownloading {
-                sendNotification(
-                    title: "Murmur",
-                    body: uiLanguage == "zh"
-                        ? "模型 \(whisperModel) 已就绪，可以开始使用"
-                        : "Model \(whisperModel) is ready to use"
-                )
-                playSound("Glass", volume: 0.2)
-            }
-        } catch {
-            owLog("[Murmur] Model load failed: \(error)")
-            modelLoading = false
-
-            // Delete the broken model
-            transcriber?.deleteModel(name: whisperModel)
-            refreshDownloadedModels()
-
-            // Don't auto-fallback — let user decide
-            failedModelName = whisperModel
-            lastError = uiLanguage == "zh"
-                ? "\(whisperModel) 下载不完整或已损坏"
-                : "\(whisperModel) is incomplete or corrupted"
         }
+        modelLoadTask = task
     }
 
     private func sendNotification(title: String, body: String) {
@@ -583,6 +606,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     private var transcriptionTask: Task<Void, Never>?
     private var isFirstTranscriptionDone = false
+    private var modelLoadTask: Task<Void, Never>?
 
     func cancelRecording() {
         guard recordingState != .idle else { return }
@@ -692,7 +716,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     // MARK: - Update Check
 
-    static let currentVersion = "1.5.1"
+    static let currentVersion = "1.5.2"
 
     func checkForUpdate() async {
         guard let url = URL(string: "https://api.github.com/repos/yinxinghuan/murmur/releases/latest") else { return }

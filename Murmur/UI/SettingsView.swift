@@ -54,9 +54,18 @@ struct SettingsView: View {
                         )).tag(m.name)
                     }
                 }
-                .labelsHidden().frame(width: R, alignment: .trailing)
+                .labelsHidden().frame(width: R - 24, alignment: .trailing)
                 .id(appState.downloadedWhisperModels)
                 .onChange(of: appState.whisperModel) { Task { await appState.loadModel() } }
+                Button(action: {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: WhisperTranscriber.modelBaseURL.path)
+                }) {
+                    Image(systemName: "folder")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .help(zh ? "打开模型目录" : "Open model folder")
             }
             modelStatus
 
