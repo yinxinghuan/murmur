@@ -245,7 +245,27 @@ final class WhisperTranscriber: @unchecked Sendable {
             if unique.count <= 2 { return empty }
         }
 
-        return TranscribeResult(text: text, detectedLanguage: detectedLang)
+        // Strip trailing hallucination phrases that Whisper appends to real content
+        var cleaned = text
+        let trailingHallucinations = [
+            "谢谢大家", "谢谢观看", "谢谢收看", "谢谢收听", "谢谢",
+            "感谢观看", "感谢收听", "感谢大家",
+            "请订阅", "请点赞", "一键三连",
+            "下次再见", "我们下期再见", "再见",
+            "Thank you.", "Thanks for watching.",
+            "See you next time.", "Goodbye.",
+        ]
+        for suffix in trailingHallucinations {
+            if cleaned.hasSuffix(suffix) && cleaned.count > suffix.count {
+                cleaned = String(cleaned.dropLast(suffix.count))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "，。、,. "))
+                break
+            }
+        }
+        if cleaned.isEmpty { return empty }
+
+        return TranscribeResult(text: cleaned, detectedLanguage: detectedLang)
     }
 
     /// Keep only the 2 most recent models on disk
