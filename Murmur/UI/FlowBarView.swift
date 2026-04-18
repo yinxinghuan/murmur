@@ -25,6 +25,47 @@ struct FlowBarView: View {
 // Solid black pill. White content. No border.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+/// Short label for the active polish style
+private func styleBadgeLabel(_ style: String, zh: Bool) -> String {
+    switch style {
+    case "spoken": return zh ? "口语" : "Spoken"
+    case "concise": return zh ? "精简" : "Concise"
+    case "structured": return zh ? "结构" : "Struct"
+    case "custom": return zh ? "自定" : "Custom"
+    default: return zh ? "自然" : "Natural"
+    }
+}
+
+/// Cycle to next polish style (skip "custom" if no custom prompt is set)
+private func nextPolishStyle(_ current: String, hasCustomPrompt: Bool) -> String {
+    var order = ["spoken", "natural", "concise", "structured"]
+    if hasCustomPrompt { order.append("custom") }
+    guard let idx = order.firstIndex(of: current) else { return "spoken" }
+    return order[(idx + 1) % order.count]
+}
+
+/// Style badge button (always visible, tap to cycle)
+struct StyleBadgeButton: View {
+    let style: String
+    let zh: Bool
+    var darkContent: Bool = false
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(styleBadgeLabel(style, zh: zh))
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(darkContent ? .black.opacity(0.5) : .white.opacity(0.7))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1)
+                .background(
+                    Capsule().fill(darkContent ? .black.opacity(0.08) : .white.opacity(0.15))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 struct MinimalFlowBar: View {
     @Environment(AppState.self) var appState
     @State private var showDone = false
@@ -52,6 +93,11 @@ struct MinimalFlowBar: View {
                         .frame(width: 10, height: 10)
                         .opacity(stopPulse ? 1.0 : 0.4)
                 }
+                if appState.llmCleanupEnabled {
+                    StyleBadgeButton(style: appState.polishStyle, zh: appState.uiLanguage == "zh") {
+                        appState.polishStyle = nextPolishStyle(appState.polishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
+                    }
+                }
                 AudioBars(level: appState.audioLevel, barWidth: 3, barMaxH: 16)
                 Text(fmtTime(appState.recordingDuration))
                     .font(.system(size: 13, weight: .medium, design: .monospaced))
@@ -63,6 +109,11 @@ struct MinimalFlowBar: View {
 
             // Transcribing
             HStack(spacing: 12) {
+                if appState.llmCleanupEnabled {
+                    StyleBadgeButton(style: appState.polishStyle, zh: appState.uiLanguage == "zh") {
+                        appState.polishStyle = nextPolishStyle(appState.polishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
+                    }
+                }
                 ShimmerBar(color: .white)
                     .frame(width: 80)
                 CancelButton(color: .white) { appState.cancelRecording() }
@@ -190,6 +241,11 @@ struct InvertFlowBar: View {
                         .frame(width: 10, height: 10)
                         .opacity(stopPulse ? 1.0 : 0.4)
                 }
+                if appState.llmCleanupEnabled {
+                    StyleBadgeButton(style: appState.polishStyle, zh: appState.uiLanguage == "zh", darkContent: true) {
+                        appState.polishStyle = nextPolishStyle(appState.polishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
+                    }
+                }
                 AudioBars(level: appState.audioLevel, color: .black, barWidth: 3, barMaxH: 16)
                 Text(fmtTime(appState.recordingDuration))
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
@@ -200,6 +256,11 @@ struct InvertFlowBar: View {
             .opacity(state == .recording ? 1 : 0)
 
             HStack(spacing: 12) {
+                if appState.llmCleanupEnabled {
+                    StyleBadgeButton(style: appState.polishStyle, zh: appState.uiLanguage == "zh", darkContent: true) {
+                        appState.polishStyle = nextPolishStyle(appState.polishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
+                    }
+                }
                 ShimmerBar(color: .black)
                     .frame(width: 80)
                 CancelButton(color: .black) { appState.cancelRecording() }

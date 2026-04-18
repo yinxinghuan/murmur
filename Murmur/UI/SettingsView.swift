@@ -129,12 +129,39 @@ struct SettingsView: View {
                     }
                     row(zh ? "润色模型" : "LLM", icon: "cpu") {
                         Picker("", selection: $appState.llmModel) {
-                            llmModelLabel("qwen2.5:1.5b (986 MB)", name: "qwen2.5:1.5b")
-                            llmModelLabel("qwen2.5:3b (1.9 GB)", name: "qwen2.5:3b")
-                            llmModelLabel("qwen2.5:7b (4.7 GB)", name: "qwen2.5:7b")
+                            llmModelLabel("qwen2.5:1.5b (986 MB)", name: "qwen2.5:1.5b", recommended: false)
+                            llmModelLabel("qwen2.5:3b (1.9 GB)", name: "qwen2.5:3b", recommended: true)
+                            llmModelLabel("qwen2.5:7b (4.7 GB)", name: "qwen2.5:7b", recommended: false)
+                        }
+                        .labelsHidden().frame(width: R, alignment: .trailing)
+                        .onChange(of: appState.llmModel) {
+                            if appState.llmModel == "qwen2.5:1.5b" {
+                                appState.polishStyle = "spoken"
+                            }
+                            Task { await appState.pullLLMModelIfNeeded() }
+                        }
+                    }
+                    if appState.llmPulling {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text(appState.llmPullProgress)
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        .padding(.leading, 30)
+                    }
+                    row(zh ? "润色风格" : "Style", icon: "paintpalette") {
+                        Picker("", selection: $appState.polishStyle) {
+                            Text(zh ? "口语" : "Spoken").tag("spoken")
+                            Text(zh ? "自然" : "Natural").tag("natural")
+                            if appState.llmModel != "qwen2.5:1.5b" {
+                                Text(zh ? "精简" : "Concise").tag("concise")
+                                Text(zh ? "结构化 β" : "Structured β").tag("structured")
+                                Text(zh ? "自定义" : "Custom").tag("custom")
+                            }
                         }
                         .labelsHidden().frame(width: R, alignment: .trailing)
                     }
+                    StyleDescription(style: appState.polishStyle, zh: zh, customPrompt: $appState.customPolishPrompt)
                 }
                 .padding(.leading, 12)
             }
@@ -231,7 +258,7 @@ struct SettingsView: View {
             HStack {
                 Label(zh ? "退出 Murmur" : "Quit Murmur", systemImage: "xmark.circle")
                 Spacer()
-                Text("v1.4.1").font(.caption).foregroundStyle(.tertiary)
+                Text("v1.5.0").font(.caption).foregroundStyle(.tertiary)
             }
             .onTapGesture { NSApplication.shared.terminate(nil) }
         }
@@ -439,9 +466,13 @@ struct SettingsView: View {
         return "base"
     }
 
-    private func llmModelLabel(_ label: String, name: String) -> some View {
+    private func llmModelLabel(_ label: String, name: String, recommended: Bool = false) -> some View {
         let installed = appState.installedLLMModels.contains(name)
-        return Text("\(label)\(installed ? "" : " ⤓")").tag(name)
+        let zh = appState.uiLanguage == "zh"
+        var s = label
+        if recommended { s += zh ? " ★推荐" : " ★" }
+        if !installed { s += " ⤓" }
+        return Text(s).tag(name)
     }
 
     private func openSystemSettings(_ url: String) {
@@ -450,6 +481,107 @@ struct SettingsView: View {
 }
 
 // MARK: - Label Style
+
+// MARK: - Style Description
+
+struct StyleDescription: View {
+    let style: String
+    let zh: Bool
+    @Binding var customPrompt: String
+    @State private var showExample = false
+
+    private var info: (desc: String, before: String, after: String)? {
+        switch style {
+        case "spoken":
+            return (
+                zh ? "最小干预，只加标点，保留所有原话" : "Minimal — only adds punctuation",
+                zh ? "字体小了看着费劲" : "font is small hard to read",
+                zh ? "字体小了，看着费劲。" : "Font is small, hard to read."
+            )
+        case "natural":
+            return (
+                zh ? "删除口语词，修正标点，保持原意" : "Remove filler words, fix punctuation",
+                zh ? "嗯就是字体小了看着费劲" : "um like font is small hard to read",
+                zh ? "字体小了，看着费劲。" : "Font is small, hard to read."
+            )
+        case "concise":
+            return (
+                zh ? "压缩冗余，直达意图，节省 token" : "Compress to core intent, save tokens",
+                zh ? "我觉得就是字体有点小了看着费劲" : "I think font is kinda small and hard to read",
+                zh ? "字体太小。" : "Font too small."
+            )
+        case "structured":
+            return (
+                zh ? "多步骤口语转有序列表（实验性）" : "Multi-step → numbered list (experimental)",
+                zh ? "改颜色再调字体" : "Fix color then adjust font",
+                zh ? "1. 改颜色\n2. 调字体" : "1. Fix color\n2. Adjust font"
+            )
+        default:
+            return nil
+        }
+    }
+
+    var body: some View {
+        if style == "custom" {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(zh ? "自定义润色指令" : "Custom polish prompt")
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                TextEditor(text: $customPrompt)
+                    .font(.system(size: 11, design: .monospaced))
+                    .frame(height: 60)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
+                    )
+                Text(zh ? "描述你希望如何处理语音转写文本" : "Describe how you want the transcript processed")
+                    .font(.caption).foregroundStyle(.tertiary)
+            }
+            .padding(.leading, 30)
+        } else if let info {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Spacer()
+                    Text(info.desc)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) { showExample.toggle() }
+                    } label: {
+                        Image(systemName: showExample ? "xmark.circle.fill" : "questionmark.circle")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if showExample {
+                    VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(zh ? "语音原文" : "Voice input")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.tertiary)
+                            Text(info.before)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(zh ? "润色结果" : "Polished")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color.accentColor.opacity(0.7))
+                            Text(info.after)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
+                }
+            }
+            .padding(.leading, 30)
+        }
+    }
+}
 
 struct SettingsLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {

@@ -37,6 +37,12 @@ final class AppState {
     var llmModel: String {
         didSet { UserDefaults.standard.set(llmModel, forKey: "llmModel") }
     }
+    var polishStyle: String {
+        didSet { UserDefaults.standard.set(polishStyle, forKey: "polishStyle") }
+    }
+    var customPolishPrompt: String {
+        didSet { UserDefaults.standard.set(customPolishPrompt, forKey: "customPolishPrompt") }
+    }
     var flowBarEnabled: Bool {
         didSet { UserDefaults.standard.set(flowBarEnabled, forKey: "flowBarEnabled") }
     }
@@ -103,6 +109,8 @@ final class AppState {
     }
     var accessibilityGranted: Bool = false
     var microphoneGranted: Bool = false
+    var llmPulling: Bool = false
+    var llmPullProgress: String = ""
     var downloadedWhisperModels: Set<String> = []
     var installedLLMModels: Set<String> = []
 
@@ -152,7 +160,9 @@ final class AppState {
         } else {
             protectedTerms = defaults.stringArray(forKey: "protectedTerms") ?? []
         }
-        llmModel = defaults.string(forKey: "llmModel") ?? "qwen2.5:1.5b"
+        llmModel = defaults.string(forKey: "llmModel") ?? "qwen2.5:3b"
+        polishStyle = defaults.string(forKey: "polishStyle") ?? "natural"
+        customPolishPrompt = defaults.string(forKey: "customPolishPrompt") ?? ""
         flowBarEnabled = defaults.object(forKey: "flowBarEnabled") as? Bool ?? true
         flowBarTheme = defaults.string(forKey: "flowBarTheme") ?? "voiceFirst"
         translateToEnglish = defaults.object(forKey: "translateToEnglish") as? Bool ?? false
@@ -229,9 +239,13 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         await loadModel()
         owLog("[Murmur] Model loaded: \(modelLoaded)")
 
-        // Check Ollama availability
+        // Check Ollama availability and pull LLM model if needed
         ollamaAvailable = await LLMCleanup.checkAvailability()
         owLog("[Murmur] Ollama available: \(ollamaAvailable)")
+        if ollamaAvailable {
+            await refreshInstalledLLMModels()
+            await pullLLMModelIfNeeded()
+        }
 
         // Setup reminders
         reminderManager = ReminderManager.shared
@@ -488,8 +502,15 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
                     }
                 } else {
                     let rawText = text
+                    let style = PolishStyle(rawValue: polishStyle) ?? .natural
                     if llmCleanupEnabled && ollamaAvailable {
-                        text = await llmCleanup?.cleanup(text: text, model: llmModel, protectedTerms: protectedTerms) ?? text
+                        text = await llmCleanup?.cleanup(
+                            text: text,
+                            model: llmModel,
+                            style: style,
+                            customPrompt: customPolishPrompt,
+                            protectedTerms: protectedTerms
+                        ) ?? text
                         owLog("[Murmur] Cleaned: \(text)")
                     }
 
@@ -623,6 +644,60 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
                 installedLLMModels = names
             }
         } catch {}
+    }
+
+    // MARK: - LLM Model Pull
+
+    func pullLLMModelIfNeeded() async {
+        guard ollamaAvailable else { return }
+        guard !installedLLMModels.contains(llmModel) else { return }
+        guard !llmPulling else { return }
+
+        llmPulling = true
+        llmPullProgress = uiLanguage == "zh" ? "准备下载..." : "Preparing..."
+        owLog("[Murmur] Pulling LLM model: \(llmModel)")
+
+        guard let url = URL(string: "http://localhost:11434/api/pull") else {
+            llmPulling = false
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["name": llmModel])
+
+        do {
+            let (bytes, _) = try await URLSession.shared.bytes(for: request)
+            for try await line in bytes.lines {
+                if let data = line.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    if let status = json["status"] as? String {
+                        await MainActor.run {
+                            if let total = json["total"] as? Int64, let completed = json["completed"] as? Int64, total > 0 {
+                                let pct = Int(Double(completed) / Double(total) * 100)
+                                llmPullProgress = "\(status) \(pct)%"
+                            } else {
+                                llmPullProgress = status
+                            }
+                        }
+                    }
+                }
+            }
+            owLog("[Murmur] LLM model pull complete: \(llmModel)")
+            await refreshInstalledLLMModels()
+            sendNotification(
+                title: "Murmur",
+                body: uiLanguage == "zh"
+                    ? "模型 \(llmModel) 已就绪"
+                    : "Model \(llmModel) is ready"
+            )
+        } catch {
+            owLog("[Murmur] LLM pull error: \(error)")
+        }
+
+        llmPulling = false
+        llmPullProgress = ""
     }
 
     // MARK: - Chinese Variant
