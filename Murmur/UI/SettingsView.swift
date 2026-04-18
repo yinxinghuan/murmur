@@ -95,6 +95,25 @@ struct SettingsView: View {
                 .frame(width: R, alignment: .trailing)
             }
 
+            // Translation (before LLM — overrides polish)
+            if appState.language != "en" && appState.whisperModel != "small.en" {
+                row(zh ? "翻译输出" : "Translate", icon: "character.bubble") {
+                    Picker("", selection: $appState.translateToEnglish) {
+                        Text(zh ? "原文" : "Off").tag(false)
+                        Text(zh ? "译为英文" : "→ EN").tag(true)
+                    }
+                    .labelsHidden().pickerStyle(.segmented)
+                    .frame(width: R, alignment: .trailing)
+                }
+                if appState.translateToEnglish {
+                    HStack {
+                        Spacer()
+                        Text(zh ? "翻译模式下不进行文本润色" : "Text polish is skipped in translation mode")
+                            .font(.system(size: 12)).foregroundStyle(.tertiary)
+                    }
+                }
+            }
+
             Divider()
 
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -104,16 +123,18 @@ struct SettingsView: View {
             // Text polish
             row(zh ? "文本润色" : "Text polish", icon: "sparkle") {
                 HStack(spacing: 6) {
-                    if appState.llmCleanupEnabled {
+                    if appState.llmCleanupEnabled && !appState.translateToEnglish {
                         Text(appState.ollamaAvailable ? (zh ? "已连接" : "OK") : (zh ? "未连接" : "Off"))
                             .font(.caption2)
                             .foregroundStyle(appState.ollamaAvailable ? Color.secondary : Color.orange)
                     }
                     Toggle("", isOn: $appState.llmCleanupEnabled)
                         .toggleStyle(.switch).labelsHidden().controlSize(.mini)
+                        .disabled(appState.translateToEnglish)
                 }.frame(width: R, alignment: .trailing)
             }
-            if appState.llmCleanupEnabled {
+            .opacity(appState.translateToEnglish ? 0.4 : 1.0)
+            if appState.llmCleanupEnabled && !appState.translateToEnglish {
                 VStack(alignment: .leading, spacing: 8) {
                     if !appState.ollamaAvailable {
                         HStack(spacing: 6) {
@@ -151,6 +172,9 @@ struct SettingsView: View {
                     }
                     row(zh ? "润色风格" : "Style", icon: "paintpalette") {
                         Picker("", selection: $appState.polishStyle) {
+                            if appState.llmModel != "qwen2.5:1.5b" {
+                                Text(zh ? "自动" : "Auto").tag("auto")
+                            }
                             Text(zh ? "口语" : "Spoken").tag("spoken")
                             Text(zh ? "自然" : "Natural").tag("natural")
                             if appState.llmModel != "qwen2.5:1.5b" {
@@ -196,8 +220,8 @@ struct SettingsView: View {
 
             Divider()
 
-            // Chinese format (conditional)
-            if (appState.language == "zh" || appState.language == "") && !appState.translateToEnglish {
+            // Chinese format
+            if appState.language == "zh" || appState.language == "" {
                 row(zh ? "中文格式" : "Chinese", icon: "character") {
                     Picker("", selection: $appState.chineseVariant) {
                         Text(zh ? "简体" : "简").tag("simplified")
@@ -206,20 +230,11 @@ struct SettingsView: View {
                     }
                     .labelsHidden().pickerStyle(.segmented)
                     .frame(width: R, alignment: .trailing)
+                    .disabled(appState.translateToEnglish)
                 }
+                .opacity(appState.translateToEnglish ? 0.4 : 1.0)
             }
 
-            // Translation (conditional)
-            if appState.language != "en" && appState.whisperModel != "small.en" {
-                row(zh ? "翻译输出" : "Translate", icon: "character.bubble") {
-                    Picker("", selection: $appState.translateToEnglish) {
-                        Text(zh ? "原文" : "Off").tag(false)
-                        Text(zh ? "译为英文" : "→ EN").tag(true)
-                    }
-                    .labelsHidden().pickerStyle(.segmented)
-                    .frame(width: R, alignment: .trailing)
-                }
-            }
 
             // Advanced — collapsed by default
             HStack {
@@ -258,7 +273,21 @@ struct SettingsView: View {
             HStack {
                 Label(zh ? "退出 Murmur" : "Quit Murmur", systemImage: "xmark.circle")
                 Spacer()
-                Text("v1.5.0").font(.caption).foregroundStyle(.tertiary)
+                if let latest = appState.latestVersion {
+                    Button {
+                        NSWorkspace.shared.open(URL(string: "https://github.com/yinxinghuan/murmur/releases/latest")!)
+                    } label: {
+                        Text(zh ? "v\(latest) 可更新" : "v\(latest) available")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.accentColor))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text("v\(AppState.currentVersion)").font(.caption).foregroundStyle(.tertiary)
+                }
             }
             .onTapGesture { NSApplication.shared.terminate(nil) }
         }
@@ -272,6 +301,7 @@ struct SettingsView: View {
             Task {
                 await appState.refreshOllamaStatus()
                 await appState.refreshInstalledLLMModels()
+                await appState.checkForUpdate()
             }
         }
     }
@@ -492,6 +522,12 @@ struct StyleDescription: View {
 
     private var info: (desc: String, before: String, after: String)? {
         switch style {
+        case "auto":
+            return (
+                zh ? "根据内容智能选择处理方式" : "Auto-selects the best style for your content",
+                zh ? "改颜色加字段还有测试要写" : "Fix color, add field, also write tests",
+                zh ? "1. 改颜色\n2. 加字段\n3. 写测试" : "1. Fix color\n2. Add field\n3. Write tests"
+            )
         case "spoken":
             return (
                 zh ? "最小干预，只加标点，保留所有原话" : "Minimal — only adds punctuation",
@@ -513,8 +549,8 @@ struct StyleDescription: View {
         case "structured":
             return (
                 zh ? "多步骤口语转有序列表（实验性）" : "Multi-step → numbered list (experimental)",
-                zh ? "改颜色再调字体" : "Fix color then adjust font",
-                zh ? "1. 改颜色\n2. 调字体" : "1. Fix color\n2. Adjust font"
+                zh ? "改颜色加字段写测试" : "Fix color, add field, write tests",
+                zh ? "1. 改颜色\n2. 加字段\n3. 写测试" : "1. Fix color\n2. Add field\n3. Write tests"
             )
         default:
             return nil
@@ -562,6 +598,7 @@ struct StyleDescription: View {
                             Text(info.before)
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
@@ -571,6 +608,7 @@ struct StyleDescription: View {
                             Text(info.after)
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(.primary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

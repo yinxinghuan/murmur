@@ -28,6 +28,7 @@ struct FlowBarView: View {
 /// Short label for the active polish style
 private func styleBadgeLabel(_ style: String, zh: Bool) -> String {
     switch style {
+    case "auto": return zh ? "自动" : "Auto"
     case "spoken": return zh ? "口语" : "Spoken"
     case "concise": return zh ? "精简" : "Concise"
     case "structured": return zh ? "结构" : "Struct"
@@ -93,7 +94,7 @@ struct MinimalFlowBar: View {
                         .frame(width: 10, height: 10)
                         .opacity(stopPulse ? 1.0 : 0.4)
                 }
-                if appState.llmCleanupEnabled {
+                if appState.llmCleanupEnabled && appState.polishStyle != "auto" {
                     StyleBadgeButton(style: appState.polishStyle, zh: appState.uiLanguage == "zh") {
                         appState.polishStyle = nextPolishStyle(appState.polishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
                     }
@@ -109,7 +110,7 @@ struct MinimalFlowBar: View {
 
             // Transcribing
             HStack(spacing: 12) {
-                if appState.llmCleanupEnabled {
+                if appState.llmCleanupEnabled && appState.polishStyle != "auto" {
                     StyleBadgeButton(style: appState.polishStyle, zh: appState.uiLanguage == "zh") {
                         appState.polishStyle = nextPolishStyle(appState.polishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
                     }

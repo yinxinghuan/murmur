@@ -1,6 +1,7 @@
 import Foundation
 
 enum PolishStyle: String, CaseIterable {
+    case auto       // 自动：根据内容智能选择处理方式
     case spoken     // 口语：最小干预，只加标点
     case natural    // 自然：去口语词，修标点
     case concise    // 精简：压缩冗余，直达意图
@@ -17,6 +18,21 @@ final class LLMCleanup: Sendable {
         - 代码相关的技术术语保持原样
         - 中文文本用中文标点（。，！？）
         - 只输出处理后的文本，不要加引号
+        """
+
+    private let autoPrompt = """
+        智能处理这段语音转写。根据内容自动选择最合适的方式：
+        - 如果内容包含多个步骤或任务 → 输出为编号列表（1. 2. 3.）
+        - 如果内容很啰嗦有大量冗余 → 精简到核心意图
+        - 如果内容简单清晰 → 只删除口语词，加标点
+        - 如果内容很短 → 几乎不改，只加标点
+        - 如果输入是纯英文 → 只清理语法和标点，保持英文输出
+        规则：
+        - 禁止添加原文没有的内容
+        - 中文文字之间不要加空格！只在中英文交界处加空格
+        - 保留所有英文术语原样！不要把英文翻译成中文！
+        - 禁止翻译！输入什么语言就输出什么语言！中文输入输出中文，英文输入输出英文！
+        - 只输出处理后的结果
         """
 
     private let spokenPrompt = """
@@ -51,7 +67,8 @@ final class LLMCleanup: Sendable {
     private let structuredPrompt = """
         整理这段语音转写为结构化格式。
         规则：
-        - 多个事项用编号列表，单个事项用一句简洁的话
+        - 提取要点，输出为编号列表（1. 2. 3.）
+        - 每个要点一行，简洁明了
         - 删除所有口语词和冗余
         - 禁止添加原文没有的内容或解释
         - 保留所有英文术语原样！不要把英文翻译成中文！
@@ -59,9 +76,10 @@ final class LLMCleanup: Sendable {
         """
 
     /// Build the full prompt for a given style
-    private func buildPrompt(style: PolishStyle, customPrompt: String, protectedTerms: [String]) -> String {
+    private func buildPrompt(style: PolishStyle, text: String, customPrompt: String, protectedTerms: [String]) -> String {
         let stylePrompt: String
         switch style {
+        case .auto: stylePrompt = autoPrompt
         case .spoken: stylePrompt = spokenPrompt
         case .natural: stylePrompt = naturalPrompt
         case .concise: stylePrompt = concisePrompt
@@ -103,6 +121,7 @@ final class LLMCleanup: Sendable {
     /// Natural should never add content; concise/structured may reformat.
     private func maxLengthMultiplier(for style: PolishStyle) -> Double {
         switch style {
+        case .auto: return 2.0
         case .spoken: return 1.2
         case .natural: return 1.5
         case .concise: return 1.5
@@ -125,7 +144,7 @@ final class LLMCleanup: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 30
 
-        let prompt = buildPrompt(style: style, customPrompt: customPrompt, protectedTerms: protectedTerms)
+        let prompt = buildPrompt(style: style, text: text, customPrompt: customPrompt, protectedTerms: protectedTerms)
         let body: [String: Any] = [
             "model": model,
             "prompt": "\(prompt)\n\nTranscript: \(text)",
@@ -164,12 +183,40 @@ final class LLMCleanup: Sendable {
                     return text
                 }
 
-                return cleaned
+                return Self.removeSpacesBetweenChinese(cleaned)
             }
         } catch {
             // Silently fall back to raw text
         }
 
         return text
+    }
+
+    /// Remove spaces between Chinese characters (LLM sometimes adds word-level spaces)
+    /// Preserves spaces around English words and numbers.
+    private static let cjkPunctBefore: Set<Character> = Set(Array("，。！？、；：\u{201C}\u{201D}\u{2018}\u{2019}）】」"))
+    private static let cjkPunctAfter: Set<Character> = Set(Array("，。！？、；：\u{201C}\u{201D}\u{2018}\u{2019}（【「"))
+
+    private static func isCJK(_ c: Character) -> Bool {
+        guard let sv = c.unicodeScalars.first else { return false }
+        return sv.value >= 0x4E00 && sv.value <= 0x9FFF
+    }
+
+    private static func removeSpacesBetweenChinese(_ text: String) -> String {
+        var result = ""
+        let chars = Array(text)
+        for i in 0..<chars.count {
+            let c = chars[i]
+            if c == " " && i > 0 && i < chars.count - 1 {
+                let prev = chars[i - 1]
+                let next = chars[i + 1]
+                if (isCJK(prev) || cjkPunctBefore.contains(prev)) &&
+                   (isCJK(next) || cjkPunctAfter.contains(next)) {
+                    continue
+                }
+            }
+            result.append(c)
+        }
+        return result
     }
 }

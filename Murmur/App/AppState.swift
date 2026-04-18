@@ -111,6 +111,7 @@ final class AppState {
     var microphoneGranted: Bool = false
     var llmPulling: Bool = false
     var llmPullProgress: String = ""
+    var latestVersion: String?
     var downloadedWhisperModels: Set<String> = []
     var installedLLMModels: Set<String> = []
 
@@ -161,7 +162,7 @@ final class AppState {
             protectedTerms = defaults.stringArray(forKey: "protectedTerms") ?? []
         }
         llmModel = defaults.string(forKey: "llmModel") ?? "qwen2.5:3b"
-        polishStyle = defaults.string(forKey: "polishStyle") ?? "natural"
+        polishStyle = defaults.string(forKey: "polishStyle") ?? "auto"
         customPolishPrompt = defaults.string(forKey: "customPolishPrompt") ?? ""
         flowBarEnabled = defaults.object(forKey: "flowBarEnabled") as? Bool ?? true
         flowBarTheme = defaults.string(forKey: "flowBarTheme") ?? "voiceFirst"
@@ -502,8 +503,8 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
                     }
                 } else {
                     let rawText = text
-                    let style = PolishStyle(rawValue: polishStyle) ?? .natural
-                    if llmCleanupEnabled && ollamaAvailable {
+                    let style = PolishStyle(rawValue: polishStyle) ?? .auto
+                    if llmCleanupEnabled && ollamaAvailable && !translateToEnglish {
                         text = await llmCleanup?.cleanup(
                             text: text,
                             model: llmModel,
@@ -642,6 +643,26 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
                     }
                 }
                 installedLLMModels = names
+            }
+        } catch {}
+    }
+
+    // MARK: - Update Check
+
+    static let currentVersion = "1.5.0"
+
+    func checkForUpdate() async {
+        guard let url = URL(string: "https://api.github.com/repos/yinxinghuan/murmur/releases/latest") else { return }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        do {
+            let (data, _) = try await URLSession.shared.data(for: request)
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let tagName = json["tag_name"] as? String {
+                let remote = tagName.trimmingCharacters(in: CharacterSet(charactersIn: "v"))
+                if remote != Self.currentVersion {
+                    latestVersion = remote
+                }
             }
         } catch {}
     }

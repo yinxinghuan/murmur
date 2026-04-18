@@ -50,7 +50,7 @@ cp -R build/Murmur.app /Applications/
 |-------|------|-------|---------|
 | Tiny | 39 MB | ★★★★★ | ★★ |
 | Base | 140 MB | ★★★★ | ★★ |
-| Small | 460 MB | ★★★ | ★★★ (default) |
+| Small | 460 MB | ★★★ | ★★★ |
 | Large v3 Turbo | 1.6 GB | ★★★ | ★★★★ |
 | Large v3 | 3 GB | ★★ | ★★★★★ |
 
@@ -150,7 +150,7 @@ cp -R build/Murmur.app /Applications/
 |------|------|------|---------|
 | Tiny | 39 MB | ★★★★★ | ★★ |
 | Base | 140 MB | ★★★★ | ★★ |
-| Small | 460 MB | ★★★ | ★★★（默认） |
+| Small | 460 MB | ★★★ | ★★★ |
 | Large v3 Turbo | 1.6 GB | ★★★ | ★★★★ |
 | Large v3 | 3 GB | ★★ | ★★★★★ |
 
