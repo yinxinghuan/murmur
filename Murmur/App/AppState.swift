@@ -425,6 +425,16 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         recordingDuration = 0
         audioLevel = 0
         lastError = nil
+
+        // Pause system media playback during recording
+        if isSystemMediaPlaying() {
+            sendMediaKey(.pause)
+            didPauseSystemMedia = true
+            owLog("[Murmur] Paused system media")
+        } else {
+            didPauseSystemMedia = false
+        }
+
         playSound("Tink", volume: 0.3)
 
         // Show flow bar when recording starts
@@ -600,7 +610,16 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
             }
 
             recordingState = .idle
+            resumeSystemMedia()
             hideFlowBarAfterDelay()
+        }
+    }
+
+    private func resumeSystemMedia() {
+        if didPauseSystemMedia {
+            sendMediaKey(.play)
+            didPauseSystemMedia = false
+            owLog("[Murmur] Resumed system media")
         }
     }
 
@@ -608,6 +627,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     private var transcriptionTask: Task<Void, Never>?
     private var isFirstTranscriptionDone = false
+    private var didPauseSystemMedia = false
     private var modelLoadTask: Task<Void, Never>?
 
     func cancelRecording() {
@@ -626,6 +646,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         recordingTimer?.invalidate()
         recordingTimer = nil
         recordingState = .idle
+        resumeSystemMedia()
         playSound("Funk", volume: 0.2)
         hideFlowBarAfterDelay(0.3)
     }
@@ -723,7 +744,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     // MARK: - Update Check
 
-    static let currentVersion = "1.6.0"
+    static let currentVersion = "1.6.1"
 
     func checkForUpdate() async {
         guard let url = URL(string: "https://api.github.com/repos/yinxinghuan/murmur/releases/latest") else { return }
@@ -813,5 +834,65 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         guard let sound = NSSound(named: NSSound.Name(name)) else { return }
         sound.volume = volume
         sound.play()
+    }
+
+    // MARK: - System Media Control
+
+    enum MediaKeyAction { case play, pause }
+
+    private func sendMediaKey(_ action: MediaKeyAction) {
+        // NX_KEYTYPE_PLAY = 16
+        let keyCode: UInt32 = 16
+        func postMediaKeyEvent(down: Bool) {
+            let flags: UInt32 = down ? 0xa00 : 0xb00
+            let data1 = Int((keyCode << 16) | (down ? (0xa << 8) : (0xb << 8)))
+            let event = NSEvent.otherEvent(
+                with: .systemDefined,
+                location: .zero,
+                modifierFlags: NSEvent.ModifierFlags(rawValue: UInt(flags)),
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                subtype: 8,
+                data1: data1,
+                data2: -1
+            )
+            event?.cgEvent?.post(tap: .cghidEventTap)
+        }
+        // Only send pause or play based on action
+        if action == .pause {
+            postMediaKeyEvent(down: true)
+            postMediaKeyEvent(down: false)
+        } else {
+            postMediaKeyEvent(down: true)
+            postMediaKeyEvent(down: false)
+        }
+    }
+
+    private func isSystemMediaPlaying() -> Bool {
+        // Use MRMediaRemoteGetNowPlayingInfo to check if media is playing
+        // Fallback: check if any audio output is active via CoreAudio
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var deviceID: AudioDeviceID = 0
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID) == noErr else {
+            return false
+        }
+
+        var isRunning: UInt32 = 0
+        var runningSize = UInt32(MemoryLayout<UInt32>.size)
+        var runningAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectGetPropertyData(deviceID, &runningAddress, 0, nil, &runningSize, &isRunning) == noErr else {
+            return false
+        }
+        return isRunning != 0
     }
 }

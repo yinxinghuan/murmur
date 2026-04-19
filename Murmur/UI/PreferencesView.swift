@@ -57,10 +57,25 @@ struct MainWindowView: View {
                 .pickerStyle(.segmented)
                 .frame(width: 72)
 
-                Text("v\(AppState.currentVersion)")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.quaternary)
-                    .padding(.top, 4)
+                HStack(spacing: 4) {
+                    Text("v\(AppState.currentVersion)")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.quaternary)
+                    if let latest = appState.latestVersion {
+                        Button(action: {
+                            NSWorkspace.shared.open(URL(string: "https://github.com/yinxinghuan/murmur/releases/latest")!)
+                        }) {
+                            Text(zh ? "有更新" : "Update")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.accentColor))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 4)
             }
             .padding(.horizontal, 16)
             .padding(.top, 28)
@@ -97,7 +112,12 @@ struct MainWindowView: View {
     }
 
     private func sidebarButton(_ tab: MainTab) -> some View {
-        Button(action: { withAnimation(.easeInOut(duration: 0.15)) { selectedTab = tab } }) {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                if tab == .settings { settingsSubTab = .general }
+                selectedTab = tab
+            }
+        }) {
             HStack(spacing: 8) {
                 Image(systemName: tab.icon)
                     .font(.system(size: 14))
