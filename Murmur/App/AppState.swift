@@ -748,7 +748,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     // MARK: - Update Check
 
-    static let currentVersion = "1.6.3"
+    static let currentVersion = "1.6.4"
 
     func checkForUpdate() async {
         guard let url = URL(string: "https://api.github.com/repos/yinxinghuan/murmur/releases/latest") else { return }

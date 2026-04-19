@@ -60,13 +60,9 @@ final class PreferencesWindowController {
 
 private final class WindowDelegate: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
-        // Delay policy switch to avoid visual glitch
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            // Only switch back if no windows are visible
-            let hasVisibleWindows = NSApp.windows.contains { $0.isVisible && !($0 is NSPanel) }
-            if !hasVisibleWindows {
-                NSApp.setActivationPolicy(.accessory)
-            }
+        // Delay policy switch to avoid menu bar flash
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NSApp.setActivationPolicy(.accessory)
         }
     }
 }
