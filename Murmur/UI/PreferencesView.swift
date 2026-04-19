@@ -33,12 +33,13 @@ struct MainWindowView: View {
             // ── Sidebar ──
             VStack(spacing: 4) {
                 // Logo
-                HStack(spacing: 8) {
-                    MurmurLogo(color: .primary).frame(width: 24, height: 24)
+                HStack(spacing: 10) {
+                    MurmurLogo(color: .primary).frame(width: 44, height: 44)
                     Text("Murmur")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 20, weight: .semibold))
                 }
-                .padding(.bottom, 20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 24)
 
                 ForEach(MainTab.allCases, id: \.self) { tab in
                     sidebarButton(tab)
@@ -60,10 +61,11 @@ struct MainWindowView: View {
                     .foregroundStyle(.quaternary)
                     .padding(.top, 4)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 16)
-            .frame(width: 140)
-            .background(Color.primary.opacity(0.02))
+            .padding(.horizontal, 16)
+            .padding(.top, 28)
+            .padding(.bottom, 16)
+            .frame(width: 200)
+            .background(Color.primary.opacity(0.03))
 
             // Separator
             Rectangle()
@@ -73,14 +75,14 @@ struct MainWindowView: View {
             // ── Content ──
             Group {
                 switch selectedTab {
-                case .home: HomeTab()
+                case .home: HomeTab(onNavigate: { selectedTab = $0 })
                 case .history: HistoryTab()
                 case .settings: SettingsContainerTab()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 700, height: 560)
+        .frame(width: 820, height: 620)
         .onAppear {
             appState.refreshPermissions()
             appState.refreshDownloadedModels()
@@ -99,11 +101,11 @@ struct MainWindowView: View {
                     .font(.system(size: 14))
                     .frame(width: 20)
                 Text(tab.label(zh: zh))
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13))
                 Spacer()
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 6)
                     .fill(selectedTab == tab ? Color.accentColor.opacity(0.12) : Color.clear)

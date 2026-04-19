@@ -10,9 +10,12 @@ final class PreferencesWindowController {
 
     func show() {
         if let window {
-            NSApp.setActivationPolicy(.regular)
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            // Only switch policy if needed
+            if NSApp.activationPolicy() != .regular {
+                NSApp.setActivationPolicy(.regular)
+            }
             return
         }
         createWindow()
@@ -24,14 +27,13 @@ final class PreferencesWindowController {
     }
 
     private func createWindow() {
-        let zh = AppState.shared.uiLanguage == "zh"
         let mainView = MainWindowView()
             .environment(AppState.shared)
 
         let hostingView = NSHostingView(rootView: mainView)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 560),
+            contentRect: NSRect(x: 0, y: 0, width: 820, height: 620),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -42,6 +44,7 @@ final class PreferencesWindowController {
         window.isReleasedWhenClosed = false
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
+        window.styleMask.insert(.fullSizeContentView)
 
         let delegate = WindowDelegate()
         window.delegate = delegate
@@ -56,8 +59,13 @@ final class PreferencesWindowController {
 
 private final class WindowDelegate: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
-        Task { @MainActor in
-            NSApp.setActivationPolicy(.accessory)
+        // Delay policy switch to avoid visual glitch
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            // Only switch back if no windows are visible
+            let hasVisibleWindows = NSApp.windows.contains { $0.isVisible && !($0 is NSPanel) }
+            if !hasVisibleWindows {
+                NSApp.setActivationPolicy(.accessory)
+            }
         }
     }
 }

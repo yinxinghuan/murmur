@@ -74,12 +74,23 @@ struct HistoryTab: View {
                 Spacer()
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 1) {
+                    VStack(spacing: 0) {
                         ForEach(filteredHistory) { record in
-                            historyRow(record)
+                            HistoryListRow(
+                                record: record,
+                                zh: zh,
+                                isExpanded: expandedId == record.id,
+                                onCopy: { appState.copyHistoryItem(record) },
+                                onDelete: { appState.deleteHistoryItem(record) },
+                                onToggleExpand: {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        expandedId = expandedId == record.id ? nil : record.id
+                                    }
+                                }
+                            )
+                            Divider().padding(.horizontal, 20)
                         }
                     }
-                    .padding(.horizontal, 8)
                     .padding(.vertical, 8)
                 }
             }
@@ -98,56 +109,75 @@ struct HistoryTab: View {
             .padding(.vertical, 8)
         }
     }
+}
 
-    private func historyRow(_ record: AppState.TranscriptionRecord) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(record.cleaned)
-                        .font(.system(size: 13))
-                        .lineLimit(expandedId == record.id ? nil : 2)
-                    Text(formatDate(record.date))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.quaternary)
-                }
+// MARK: - Row with hover effect (matching menu bar style)
 
-                Spacer(minLength: 4)
+private struct HistoryListRow: View {
+    let record: AppState.TranscriptionRecord
+    let zh: Bool
+    let isExpanded: Bool
+    let onCopy: () -> Void
+    let onDelete: () -> Void
+    let onToggleExpand: () -> Void
+    @State private var isHovered = false
 
-                HStack(spacing: 4) {
-                    if record.raw != record.cleaned {
-                        Button(action: {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                expandedId = expandedId == record.id ? nil : record.id
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Main row
+            HStack(spacing: 8) {
+                Text(record.cleaned)
+                    .font(.system(size: 13))
+                    .lineLimit(isExpanded ? nil : 1)
+                    .truncationMode(.tail)
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 8)
+
+                if isHovered {
+                    HStack(spacing: 6) {
+                        if record.raw != record.cleaned {
+                            Button(action: onToggleExpand) {
+                                Image(systemName: isExpanded ? "chevron.up" : "text.quote")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
                             }
-                        }) {
-                            Image(systemName: expandedId == record.id ? "chevron.up" : "chevron.down")
+                            .buttonStyle(.plain)
+                            .help(zh ? "查看原文" : "Show raw")
+                        }
+
+                        Button(action: onDelete) {
+                            Image(systemName: "xmark")
                                 .font(.system(size: 10))
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
-                        .help(zh ? "查看原文" : "Show raw")
+                        .help(zh ? "删除" : "Delete")
                     }
-
-                    Button(action: { appState.copyHistoryItem(record) }) {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .buttonStyle(.plain)
-                    .help(zh ? "复制" : "Copy")
-
-                    Button(action: { appState.deleteHistoryItem(record) }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.quaternary)
-                    }
-                    .buttonStyle(.plain)
-                    .help(zh ? "删除" : "Delete")
                 }
-                .padding(.top, 2)
-            }
 
-            if expandedId == record.id && record.raw != record.cleaned {
+                Text(formatDate(record.date))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.quaternary)
+
+                Button(action: onCopy) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 11))
+                        .foregroundStyle(isHovered ? .secondary : .quaternary)
+                }
+                .buttonStyle(.plain)
+                .help(zh ? "复制" : "Copy")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isHovered ? Color.primary.opacity(0.04) : Color.clear)
+            )
+            .contentShape(Rectangle())
+            .onHover { isHovered = $0 }
+
+            // Expanded raw text
+            if isExpanded && record.raw != record.cleaned {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(zh ? "原文" : "Raw")
                         .font(.system(size: 10, weight: .medium))
@@ -162,15 +192,11 @@ struct HistoryTab: View {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(Color.primary.opacity(0.03))
                 )
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.clear)
-        )
-        .contentShape(Rectangle())
+        .padding(.horizontal, 12)
     }
 
     private func formatDate(_ date: Date) -> String {
