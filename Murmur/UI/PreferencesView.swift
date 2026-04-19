@@ -127,14 +127,43 @@ struct MainWindowView: View {
                 Spacer()
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 10)
                     .fill(selectedTab == tab ? Color.accentColor.opacity(0.12) : Color.clear)
             )
             .foregroundStyle(selectedTab == tab ? Color.accentColor : .primary)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SidebarButtonStyle(isSelected: selectedTab == tab))
+    }
+}
+
+// MARK: - Sidebar Button Style
+
+struct SidebarButtonStyle: ButtonStyle {
+    var isSelected: Bool
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(hoverFill(isPressed: configuration.isPressed))
+            )
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+            .animation(.easeInOut(duration: 0.15), value: isHovered)
+            .onHover { hovering in
+                isHovered = hovering
+            }
+    }
+
+    private func hoverFill(isPressed: Bool) -> Color {
+        if isSelected { return .clear }
+        if isPressed { return Color.primary.opacity(0.1) }
+        if isHovered { return Color.primary.opacity(0.06) }
+        return .clear
     }
 }
 
