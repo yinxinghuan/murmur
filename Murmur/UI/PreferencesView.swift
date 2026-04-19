@@ -83,7 +83,8 @@ struct MainWindowView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 820, height: 620)
+        .frame(minWidth: 820, minHeight: 620)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             appState.refreshPermissions()
             appState.refreshDownloadedModels()
