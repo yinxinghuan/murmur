@@ -188,7 +188,9 @@ final class AppState {
         chineseVariant = defaults.string(forKey: "chineseVariant") ?? "simplified"
         autoPasteEnabled = defaults.object(forKey: "autoPasteEnabled") as? Bool ?? true
 dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
-        uiLanguage = defaults.string(forKey: "uiLanguage") ?? "zh"
+        // UI language follows system locale, fallback to "zh"
+        let systemUILang = Locale.preferredLanguages.first?.hasPrefix("zh") == true ? "zh" : "en"
+        uiLanguage = defaults.string(forKey: "uiLanguage") ?? systemUILang
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
@@ -630,7 +632,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     // MARK: - Transcription History
 
-    private static let maxHistory = 20
+    private static let maxHistory = 100
 
     func addToHistory(raw: String, cleaned: String) {
         let record = TranscriptionRecord(raw: raw, cleaned: cleaned)
@@ -643,6 +645,11 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     func clearHistory() {
         transcriptionHistory = []
+        saveHistory()
+    }
+
+    func deleteHistoryItem(_ record: TranscriptionRecord) {
+        transcriptionHistory.removeAll { $0.id == record.id }
         saveHistory()
     }
 

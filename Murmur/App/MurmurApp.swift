@@ -48,7 +48,7 @@ struct MurmurApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            SettingsView()
+            MenuBarDropdownView()
                 .environment(AppState.shared)
         } label: {
             Image(nsImage: loadMenuBarIcon())
@@ -65,10 +65,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // Set delegate so notifications show even when app is in foreground
         UNUserNotificationCenter.current().delegate = self
 
+        // Set up Cmd+, shortcut via main menu
+        setupMainMenu()
+
         Task { @MainActor in
             owLog("Starting setup...")
             await AppState.shared.setup()
         }
+    }
+
+    private func setupMainMenu() {
+        let mainMenu = NSMenu()
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu()
+        let prefsItem = NSMenuItem(
+            title: "Settings…",
+            action: #selector(openPreferences),
+            keyEquivalent: ","
+        )
+        prefsItem.target = self
+        appMenu.addItem(prefsItem)
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
+        NSApp.mainMenu = mainMenu
+    }
+
+    @objc private func openPreferences() {
+        Task { @MainActor in
+            PreferencesWindowController.shared.show()
+        }
+    }
+
+    // When user clicks app icon in Dock/Launchpad while already running
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        PreferencesWindowController.shared.show()
+        return false
     }
 
     // Show notifications as banners even when the app is active/foreground
