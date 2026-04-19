@@ -163,7 +163,23 @@ struct SettingsView: View {
                             llmModelLabel("qwen2.5:3b (1.9 GB)", name: "qwen2.5:3b", recommended: true)
                             llmModelLabel("qwen2.5:7b (4.7 GB)", name: "qwen2.5:7b", recommended: false)
                         }
-                        .labelsHidden().frame(width: R, alignment: .trailing)
+                        .labelsHidden().frame(width: R - 24, alignment: .trailing)
+                        .disabled(!appState.ollamaAvailable)
+                        Button(action: {
+                            let ollamaDir = FileManager.default.homeDirectoryForCurrentUser
+                                .appendingPathComponent(".ollama/models")
+                            if FileManager.default.fileExists(atPath: ollamaDir.path) {
+                                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: ollamaDir.path)
+                            } else {
+                                NSWorkspace.shared.open(URL(string: "https://ollama.com")!)
+                            }
+                        }) {
+                            Image(systemName: "folder")
+                                .foregroundStyle(.secondary)
+                                .font(.system(size: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .help(zh ? "打开 Ollama 模型目录" : "Open Ollama model folder")
                         .onChange(of: appState.llmModel) {
                             if appState.llmModel == "qwen2.5:1.5b" {
                                 appState.polishStyle = "spoken"
@@ -193,6 +209,7 @@ struct SettingsView: View {
                             }
                         }
                         .labelsHidden().frame(width: R, alignment: .trailing)
+                        .disabled(!appState.ollamaAvailable)
                     }
                     StyleDescription(style: appState.polishStyle, zh: zh, customPrompt: $appState.customPolishPrompt)
                 }

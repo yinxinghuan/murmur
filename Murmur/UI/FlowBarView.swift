@@ -242,7 +242,7 @@ struct InvertFlowBar: View {
                         .frame(width: 10, height: 10)
                         .opacity(stopPulse ? 1.0 : 0.4)
                 }
-                if appState.llmCleanupEnabled {
+                if appState.llmCleanupEnabled && appState.polishStyle != "auto" {
                     StyleBadgeButton(style: appState.polishStyle, zh: appState.uiLanguage == "zh", darkContent: true) {
                         appState.polishStyle = nextPolishStyle(appState.polishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
                     }
@@ -257,7 +257,7 @@ struct InvertFlowBar: View {
             .opacity(state == .recording ? 1 : 0)
 
             HStack(spacing: 12) {
-                if appState.llmCleanupEnabled {
+                if appState.llmCleanupEnabled && appState.polishStyle != "auto" {
                     StyleBadgeButton(style: appState.polishStyle, zh: appState.uiLanguage == "zh", darkContent: true) {
                         appState.polishStyle = nextPolishStyle(appState.polishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
                     }
