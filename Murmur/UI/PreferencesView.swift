@@ -23,6 +23,7 @@ enum MainTab: String, CaseIterable {
 struct MainWindowView: View {
     @Environment(AppState.self) var appState
     @State private var selectedTab: MainTab = .home
+    @State private var settingsSubTab: SettingsContainerTab.SettingsSection = .general
 
     private var zh: Bool { appState.uiLanguage == "zh" }
 
@@ -75,9 +76,9 @@ struct MainWindowView: View {
             // ── Content ──
             Group {
                 switch selectedTab {
-                case .home: HomeTab(onNavigate: { selectedTab = $0 })
+                case .home: HomeTab(onNavigate: { selectedTab = $0 }, onNavigateSettings: { settingsSubTab = $0; selectedTab = .settings })
                 case .history: HistoryTab()
-                case .settings: SettingsContainerTab()
+                case .settings: SettingsContainerTab(initialSection: settingsSubTab)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -120,6 +121,7 @@ struct MainWindowView: View {
 
 struct SettingsContainerTab: View {
     @Environment(AppState.self) var appState
+    var initialSection: SettingsSection = .general
     @State private var settingsSection: SettingsSection = .general
 
     private var zh: Bool { appState.uiLanguage == "zh" }
@@ -166,5 +168,7 @@ struct SettingsContainerTab: View {
             case .advanced: AdvancedSettingsTab()
             }
         }
+        .onChange(of: initialSection) { settingsSection = initialSection }
+        .onAppear { settingsSection = initialSection }
     }
 }

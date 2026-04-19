@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeTab: View {
     @Environment(AppState.self) var appState
     var onNavigate: ((MainTab) -> Void)?
+    var onNavigateSettings: ((SettingsContainerTab.SettingsSection) -> Void)?
 
     private var zh: Bool { appState.uiLanguage == "zh" }
 
@@ -25,27 +26,33 @@ struct HomeTab: View {
                         .font(.system(size: 34, weight: .regular))
                         .lineSpacing(4)
 
-                    Text(zh ? "按住 Right ⌥ 说话，松开自动粘贴到光标处" : "Hold Right ⌥ to speak, release to auto-paste")
+                    Text(zh ? "本地处理 · 按住 Right ⌥ 说话，松开自动粘贴" : "Local processing · Hold Right ⌥ to speak, release to paste")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
 
-                    // Status pills
+                    // Status pills (clickable → navigate to settings)
                     HStack(spacing: 8) {
-                        statusPill(
-                            icon: "waveform",
-                            label: appState.modelLoaded
-                                ? appState.whisperModel.replacingOccurrences(of: "_", with: " ")
-                                : (zh ? "模型未加载" : "No model"),
-                            color: appState.modelLoaded ? .green : (appState.modelLoading ? .blue : .orange),
-                            loading: appState.modelLoading ? appState.modelLoadProgress : nil
-                        )
-                        statusPill(
-                            icon: "sparkle",
-                            label: !appState.llmCleanupEnabled ? (zh ? "润色关闭" : "Polish off")
-                                : (appState.ollamaAvailable ? "Ollama" : (zh ? "未连接" : "Offline")),
-                            color: !appState.llmCleanupEnabled ? Color.primary.opacity(0.3)
-                                : (appState.ollamaAvailable ? .green : .orange)
-                        )
+                        Button(action: { onNavigateSettings?(.general) }) {
+                            statusPillContent(
+                                icon: "waveform",
+                                label: appState.modelLoaded
+                                    ? appState.whisperModel.replacingOccurrences(of: "_", with: " ")
+                                    : (zh ? "模型未加载" : "No model"),
+                                color: appState.modelLoaded ? .green : (appState.modelLoading ? .blue : .orange),
+                                loading: appState.modelLoading ? appState.modelLoadProgress : nil
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        Button(action: { onNavigateSettings?(.advanced) }) {
+                            statusPillContent(
+                                icon: "sparkle",
+                                label: !appState.llmCleanupEnabled ? (zh ? "润色关闭" : "Polish off")
+                                    : (appState.ollamaAvailable ? "Ollama" : (zh ? "未连接" : "Offline")),
+                                color: !appState.llmCleanupEnabled ? Color.primary.opacity(0.3)
+                                    : (appState.ollamaAvailable ? .green : .orange)
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                     .padding(.top, 4)
                 }
@@ -56,21 +63,21 @@ struct HomeTab: View {
                     StatCard(
                         value: "\(todayCount)",
                         label: zh ? "今日转写" : "Today",
-                        icon: "mic.fill",
+                        subtitle: zh ? "次语音输入" : "voice inputs",
                         tintLight: Color(hue: 0.45, saturation: 0.12, brightness: 0.95),
                         tintDark: Color(hue: 0.45, saturation: 0.25, brightness: 0.22)
                     ) { onNavigate?(.history) }
                     StatCard(
                         value: "\(todayWords)",
                         label: zh ? "今日字数" : "Words",
-                        icon: "character.cursor.ibeam",
+                        subtitle: zh ? "个字符已转写" : "characters transcribed",
                         tintLight: Color(hue: 0.75, saturation: 0.10, brightness: 0.95),
                         tintDark: Color(hue: 0.75, saturation: 0.20, brightness: 0.22)
                     ) { onNavigate?(.history) }
                     StatCard(
                         value: "\(totalCount)",
                         label: zh ? "全部记录" : "Total",
-                        icon: "clock.fill",
+                        subtitle: zh ? "条历史记录" : "total records",
                         tintLight: Color(hue: 0.12, saturation: 0.10, brightness: 0.96),
                         tintDark: Color(hue: 0.12, saturation: 0.20, brightness: 0.22)
                     ) { onNavigate?(.history) }
@@ -130,7 +137,7 @@ struct HomeTab: View {
 
     // MARK: - Status Pill
 
-    private func statusPill(icon: String, label: String, color: Color, loading: Double? = nil) -> some View {
+    private func statusPillContent(icon: String, label: String, color: Color, loading: Double? = nil) -> some View {
         HStack(spacing: 7) {
             Circle().fill(color.opacity(0.7)).frame(width: 6, height: 6)
             Image(systemName: icon)
@@ -190,7 +197,7 @@ struct HomeTab: View {
 private struct StatCard: View {
     let value: String
     let label: String
-    let icon: String
+    let subtitle: String
     let tintLight: Color
     let tintDark: Color
     @Environment(\.colorScheme) var colorScheme
@@ -211,15 +218,20 @@ private struct StatCard: View {
                         .foregroundStyle(isHovered ? .primary : .secondary)
                 }
                 Spacer()
-                Text(value)
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(value)
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 100)
             .padding(18)
             .background(
-                RoundedRectangle(cornerRadius: 22)
+                RoundedRectangle(cornerRadius: 28)
                     .fill(isHovered ? tint.opacity(0.85) : tint)
             )
             .contentShape(Rectangle())

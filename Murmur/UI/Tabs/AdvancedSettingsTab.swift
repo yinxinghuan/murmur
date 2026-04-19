@@ -14,11 +14,16 @@ struct AdvancedSettingsTab: View {
                 // ── Text Polish ──
                 settingsCard(zh ? "文本润色" : "Text Polish") {
                     settingsRow(zh ? "启用润色" : "Enable", icon: "sparkle") {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             if appState.llmCleanupEnabled && !appState.translateToEnglish {
-                                Text(appState.ollamaAvailable ? (zh ? "已连接" : "OK") : (zh ? "未连接" : "Off"))
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(appState.ollamaAvailable ? Color.green : Color.orange)
+                                HStack(spacing: 5) {
+                                    Circle()
+                                        .fill(appState.ollamaAvailable ? Color.green.opacity(0.8) : Color.orange.opacity(0.7))
+                                        .frame(width: 6, height: 6)
+                                    Text(appState.ollamaAvailable ? (zh ? "已连接" : "OK") : (zh ? "未连接" : "Off"))
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                             Toggle("", isOn: $appState.llmCleanupEnabled)
                                 .toggleStyle(.switch).labelsHidden().controlSize(.small)
