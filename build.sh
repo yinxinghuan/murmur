@@ -24,8 +24,9 @@ if [ -d "$ARCH_DIR/Murmur_Murmur.bundle" ]; then
     cp -R "$ARCH_DIR/Murmur_Murmur.bundle" "$APP_DIR/Resources/"
 fi
 
-# Copy app icon
+# Copy app icon and Credits
 cp "Murmur/Resources/AppIcon.icns" "$APP_DIR/Resources/AppIcon.icns" 2>/dev/null || true
+cp "Murmur/Resources/Credits.html" "$APP_DIR/Resources/Credits.html" 2>/dev/null || true
 
 # Copy any framework dependencies
 if [ -d "$ARCH_DIR/PackageFrameworks" ]; then

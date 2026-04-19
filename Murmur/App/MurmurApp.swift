@@ -76,6 +76,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func setupMainMenu() {
         let mainMenu = NSMenu()
+
+        // App menu
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu()
         let prefsItem = NSMenuItem(
@@ -87,6 +89,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         appMenu.addItem(prefsItem)
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
+
+        // Help items in app menu
+        appMenu.addItem(NSMenuItem.separator())
+        let helpItem = NSMenuItem(
+            title: "Murmur Help",
+            action: #selector(openHelp),
+            keyEquivalent: ""
+        )
+        helpItem.target = self
+        appMenu.addItem(helpItem)
+        let feedbackItem = NSMenuItem(
+            title: "Report an Issue…",
+            action: #selector(openIssues),
+            keyEquivalent: ""
+        )
+        feedbackItem.target = self
+        appMenu.addItem(feedbackItem)
+
         NSApp.mainMenu = mainMenu
     }
 
@@ -94,6 +114,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         Task { @MainActor in
             PreferencesWindowController.shared.show()
         }
+    }
+
+    @objc private func openHelp() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/yinxinghuan/murmur#readme")!)
+    }
+
+    @objc private func openIssues() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/yinxinghuan/murmur/issues")!)
     }
 
     // When user clicks app icon in Dock/Launchpad while already running

@@ -75,7 +75,7 @@ struct MainWindowView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.top, 4)
+                .padding(.top, 2)
             }
             .padding(.horizontal, 16)
             .padding(.top, 28)
