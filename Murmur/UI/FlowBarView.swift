@@ -153,17 +153,17 @@ struct MinimalFlowBar: View {
         }
         .onChange(of: appState.recordingState) { old, new in
             if old == .transcribing && new == .idle {
-                if appState.pasteFailed {
-                    showFailed = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        showFailed = false
-                    }
-                } else {
-                    showDone = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                        showDone = false
-                    }
+                showDone = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    showDone = false
                 }
+            }
+        }
+        .onChange(of: appState.pasteFailedTick) {
+            showDone = false
+            showFailed = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                showFailed = false
             }
         }
         .animation(.easeInOut(duration: 0.15), value: state)

@@ -185,35 +185,47 @@ private struct ToastBubbleView: View {
     private let cornerRadius: CGFloat = 10
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            // Text content
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 8) {
-                    Image(systemName: message.icon)
-                        .font(.system(size: 13))
-                        .foregroundStyle(iconColor)
-                    Text(message.title)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
+        VStack(alignment: .leading, spacing: 10) {
+            // Title
+            HStack(spacing: 6) {
+                Image(systemName: message.icon)
+                    .font(.system(size: 12))
+                    .foregroundStyle(iconColor)
+                Text(message.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.primary)
+            }
 
-                if let content = message.content, !content.isEmpty {
-                    Text(content)
-                        .font(.system(size: 13))
-                        .lineLimit(3)
-                        .foregroundStyle(.primary)
-                        .padding(.top, 6)
-                }
+            // Content + copy button
+            if let content = message.content, !content.isEmpty {
+                Text(content)
+                    .font(.system(size: 13))
+                    .lineLimit(3)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(Color.primary.opacity(0.05))
+                    )
             }
 
             if message.actionLabel != nil, message.action != nil {
-                actionButton
+                HStack {
+                    Text(message.actionDone
+                         ? (message.actionLabel == "复制" ? "已复制到剪贴板" : "Copied to clipboard")
+                         : (message.actionLabel == "复制" ? "文本已保存到剪贴板" : "Text saved to clipboard"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    actionButton
+                }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.top, arrowHeight + 12)
-        .padding(.bottom, 12)
-        .frame(maxWidth: 280)
+        .padding(.horizontal, 16)
+        .padding(.top, arrowHeight + 14)
+        .padding(.bottom, 14)
+        .frame(width: 300)
         .background(
             BubbleShape(
                 cornerRadius: cornerRadius,

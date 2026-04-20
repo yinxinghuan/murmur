@@ -5,6 +5,11 @@ import UserNotifications
 
 final class TextInjector: @unchecked Sendable {
 
+    enum PasteResult {
+        case success(appName: String)
+        case focusLost(targetAppName: String)
+    }
+
     /// Copy text to the system clipboard
     func copyToClipboard(_ text: String) {
         let pasteboard = NSPasteboard.general
@@ -12,8 +17,8 @@ final class TextInjector: @unchecked Sendable {
         pasteboard.setString(text, forType: .string)
     }
 
-    /// Paste text into the target app
-    func pasteText(_ text: String, targetApp: NSRunningApplication? = nil) {
+    /// Paste text into the target app, with result callback
+    func pasteText(_ text: String, targetApp: NSRunningApplication? = nil, completion: (@Sendable (PasteResult) -> Void)? = nil) {
         // Filter junk
         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if cleaned.isEmpty || cleaned.hasPrefix("[BLANK") {
@@ -27,6 +32,8 @@ final class TextInjector: @unchecked Sendable {
         copyToClipboard(cleaned)
 
         // Activate the target app
+        let targetName = targetApp?.localizedName ?? "unknown"
+        let targetPid = targetApp?.processIdentifier
         if let app = targetApp {
             owLog("[TextInjector] Activating: \(app.localizedName ?? "?") (pid \(app.processIdentifier))")
             app.activate()
@@ -35,16 +42,23 @@ final class TextInjector: @unchecked Sendable {
         // Wait for app to come to front, then paste via CGEvent
         let delay: TimeInterval = 0.5
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [self] in
-            // Log what's actually frontmost right now
             let frontmost = NSWorkspace.shared.frontmostApplication
-            owLog("[TextInjector] Frontmost at paste time: \(frontmost?.localizedName ?? "none") (pid \(frontmost?.processIdentifier ?? 0))")
+            let frontmostPid = frontmost?.processIdentifier
+            owLog("[TextInjector] Frontmost at paste time: \(frontmost?.localizedName ?? "none") (pid \(frontmostPid ?? 0))")
             owLog("[TextInjector] AXIsProcessTrusted: \(AXIsProcessTrusted())")
 
-            // Method 1: CGEvent Cmd+V (works in terminals, editors, everywhere IF accessibility is granted)
-            owLog("[TextInjector] Posting CGEvent Cmd+V...")
-            self.simulateCmdV()
+            // Check if target app is still in focus
+            let focusMatch = (targetPid != nil && targetPid == frontmostPid)
 
-            // Text is always in clipboard as backup — user can ⌘V if auto-paste didn't work
+            if focusMatch {
+                owLog("[TextInjector] Posting CGEvent Cmd+V...")
+                self.simulateCmdV()
+                completion?(.success(appName: targetName))
+            } else {
+                owLog("[TextInjector] Focus lost! Target: \(targetName) (pid \(targetPid ?? 0)), Frontmost: \(frontmost?.localizedName ?? "?") (pid \(frontmostPid ?? 0))")
+                // Don't send Cmd+V to wrong app — text is in clipboard as fallback
+                completion?(.focusLost(targetAppName: targetName))
+            }
         }
     }
 

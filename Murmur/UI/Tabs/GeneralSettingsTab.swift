@@ -4,6 +4,7 @@ struct GeneralSettingsTab: View {
     @Environment(AppState.self) var appState
 
     private var zh: Bool { appState.uiLanguage == "zh" }
+    @State private var showDeleteConfirm = false
 
     var body: some View {
         @Bindable var appState = appState
@@ -26,6 +27,26 @@ struct GeneralSettingsTab: View {
                             .labelsHidden()
                             .id(appState.downloadedWhisperModels)
                             .onChange(of: appState.whisperModel) { Task { await appState.loadModel() } }
+                            if appState.downloadedWhisperModels.contains(appState.whisperModel) && !appState.modelLoading {
+                                Button(action: { showDeleteConfirm = true }) {
+                                    Image(systemName: "trash")
+                                        .foregroundStyle(.secondary)
+                                        .font(.system(size: 12))
+                                }
+                                .buttonStyle(.plain)
+                                .help(zh ? "删除当前模型" : "Delete current model")
+                                .alert(
+                                    zh ? "删除模型" : "Delete Model",
+                                    isPresented: $showDeleteConfirm
+                                ) {
+                                    Button(zh ? "删除" : "Delete", role: .destructive) {
+                                        appState.deleteWhisperModel(name: appState.whisperModel)
+                                    }
+                                    Button(zh ? "取消" : "Cancel", role: .cancel) {}
+                                } message: {
+                                    Text(zh ? "确定要删除 \(appState.whisperModel) 吗？下次使用需要重新下载。" : "Delete \(appState.whisperModel)? You'll need to re-download it next time.")
+                                }
+                            }
                             Button(action: {
                                 NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: WhisperTranscriber.modelBaseURL.path)
                             }) {

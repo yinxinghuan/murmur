@@ -111,6 +111,8 @@ final class AppState {
     var lastTranscription: String = ""
     var lastError: String?
     var pasteFailed: Bool = false
+    /// Incremented when paste fails — FlowBar observes this to show failure state even after idle transition
+    var pasteFailedTick: Int = 0
     var transcriptionHistory: [TranscriptionRecord] = []
 
     struct TranscriptionRecord: Identifiable, Codable {
@@ -638,14 +640,21 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
                     pasteFailed = false
                     if autoPasteEnabled {
-                        if AXIsProcessTrusted() {
-                            textInjector?.pasteText(text, targetApp: targetApp)
-                        } else {
+                        let clipText = text
+                        let zh = uiLanguage == "zh"
+                        let targetName = targetApp?.localizedName ?? ""
+
+                        // Check if focus moved during recording/transcription
+                        let currentFrontmost = NSWorkspace.shared.frontmostApplication
+                        let focusChanged = (targetApp?.processIdentifier != currentFrontmost?.processIdentifier)
+
+                        if !AXIsProcessTrusted() {
+                            // No accessibility permission
                             pasteFailed = true
-                            let clipText = text
-                            let zh = uiLanguage == "zh"
+                            pasteFailedTick += 1
+                            textInjector?.copyToClipboard(clipText)
                             ToastController.shared.show(
-                                zh ? "自动复制失败" : "Auto-paste failed",
+                                zh ? "自动粘贴失败，请授予辅助功能权限" : "Auto-paste failed. Grant Accessibility permission.",
                                 content: clipText,
                                 icon: "exclamationmark.triangle.fill",
                                 style: .warning,
@@ -654,6 +663,47 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
                             ) {
                                 NSPasteboard.general.clearContents()
                                 NSPasteboard.general.setString(clipText, forType: .string)
+                            }
+                        } else if focusChanged {
+                            // Focus moved away during recording — don't paste to wrong app
+                            pasteFailed = true
+                            pasteFailedTick += 1
+                            textInjector?.copyToClipboard(clipText)
+                            ToastController.shared.show(
+                                zh ? "焦点已移开，未能粘贴到 \(targetName)" : "Focus changed, could not paste to \(targetName)",
+                                content: clipText,
+                                icon: "exclamationmark.circle.fill",
+                                style: .warning,
+                                duration: 6.0,
+                                actionLabel: zh ? "复制" : "Copy"
+                            ) {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(clipText, forType: .string)
+                            }
+                        } else {
+                            // Normal paste
+                            textInjector?.pasteText(text, targetApp: targetApp) { [weak self] result in
+                                Task { @MainActor in
+                                    guard let self else { return }
+                                    switch result {
+                                    case .success:
+                                        break // FlowBar checkmark is enough
+                                    case .focusLost(let appName):
+                                        self.pasteFailed = true
+                                        self.pasteFailedTick += 1
+                                        ToastController.shared.show(
+                                            zh ? "焦点已移开，未能粘贴到 \(appName)" : "Focus lost, could not paste to \(appName)",
+                                            content: clipText,
+                                            icon: "exclamationmark.circle.fill",
+                                            style: .warning,
+                                            duration: 6.0,
+                                            actionLabel: zh ? "复制" : "Copy"
+                                        ) {
+                                            NSPasteboard.general.clearContents()
+                                            NSPasteboard.general.setString(clipText, forType: .string)
+                                        }
+                                    }
+                                }
                             }
                         }
                     } else {
@@ -903,7 +953,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     // MARK: - Update Check
 
-    static let currentVersion = "1.7.1"
+    static let currentVersion = "1.7.2"
 
     func checkForUpdate() async {
         guard let url = URL(string: "https://api.github.com/repos/yinxinghuan/murmur/releases/latest") else { return }
