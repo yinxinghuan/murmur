@@ -23,7 +23,7 @@ hdiutil detach "/Volumes/$VOLUME_NAME" 2>/dev/null || true
 rm -rf "$DMG_DIR" "$DMG_PATH"
 mkdir -p "$DMG_DIR"
 
-# Copy app and create Applications symlink
+# Copy app and create Applications symlink + set icon from system
 cp -R "$APP_PATH" "$DMG_DIR/"
 ln -s /Applications "$DMG_DIR/Applications"
 
@@ -58,6 +58,8 @@ tell application "Finder"
         set theViewOptions to icon view options of container window
         set arrangement of theViewOptions to not arranged
         set icon size of theViewOptions to 80
+        set text size of theViewOptions to 12
+        set label position of theViewOptions to bottom
         set background picture of theViewOptions to file ".background:background.png"
         set position of item "Murmur.app" of container window to {165, 200}
         set position of item "Applications" of container window to {495, 200}

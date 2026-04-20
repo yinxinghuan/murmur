@@ -1,5 +1,5 @@
 #!/usr/bin/env swift
-// Generate DMG background image with drag-to-Applications arrow
+// Generate DMG background image — dark background with dashed arrow, no text labels
 import AppKit
 
 let width: CGFloat = 660
@@ -23,37 +23,27 @@ let gradient = CGGradient(
 context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: height), end: CGPoint(x: 0, y: 0), options: [])
 
 // Arrow (center, pointing right)
-let arrowY = height * 0.5
-let arrowStartX: CGFloat = 250
-let arrowEndX: CGFloat = 410
-let arrowColor = NSColor(white: 1.0, alpha: 0.35)
+let arrowY = height * 0.52
+let arrowStartX: CGFloat = 240
+let arrowEndX: CGFloat = 420
+let arrowColor = NSColor(white: 1.0, alpha: 0.3)
 
-// Arrow shaft
+// Dashed arrow shaft
 context.setStrokeColor(arrowColor.cgColor)
-context.setLineWidth(2.5)
+context.setLineWidth(2)
 context.setLineCap(.round)
+context.setLineDash(phase: 0, lengths: [8, 6])
 context.move(to: CGPoint(x: arrowStartX, y: arrowY))
-context.addLine(to: CGPoint(x: arrowEndX, y: arrowY))
+context.addLine(to: CGPoint(x: arrowEndX - 2, y: arrowY))
 context.strokePath()
 
-// Arrow head
-let headSize: CGFloat = 12
+// Arrow head (solid)
+context.setLineDash(phase: 0, lengths: [])
+let headSize: CGFloat = 10
 context.move(to: CGPoint(x: arrowEndX - headSize, y: arrowY + headSize))
 context.addLine(to: CGPoint(x: arrowEndX, y: arrowY))
 context.addLine(to: CGPoint(x: arrowEndX - headSize, y: arrowY - headSize))
 context.strokePath()
-
-// Hint text at bottom
-let paragraphStyle = NSMutableParagraphStyle()
-paragraphStyle.alignment = .center
-let attrs: [NSAttributedString.Key: Any] = [
-    .font: NSFont.systemFont(ofSize: 13, weight: .regular),
-    .foregroundColor: NSColor(white: 1.0, alpha: 0.3),
-    .paragraphStyle: paragraphStyle,
-]
-let hint = "Drag Murmur to Applications to install"
-let hintRect = NSRect(x: 0, y: 40, width: width, height: 30)
-hint.draw(in: hintRect, withAttributes: attrs)
 
 image.unlockFocus()
 
