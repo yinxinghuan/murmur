@@ -110,9 +110,14 @@ Murmur/
 
 ## 下一步
 
-- [ ] 自动发送（检测 AI 聊天框自动按回车）
-- [ ] Prompt 模板（语音触发预设 prompt）
-- [ ] 上下文感知（根据前台 app 调整润色风格）
-- [ ] 菜单栏图标录音动画
-- [ ] 白底 FlowBar 阴影裁剪问题
-- [ ] Homebrew cask（可选）
+- [ ] iOS 版本（键盘扩展 / Shortcuts Action，WhisperKit on-device）
+- [ ] Apple Developer 签名（消除 Gatekeeper 弹窗）
+- [ ] 落地页（产品介绍页面）
+- [ ] Homebrew cask（可选，等用户量上来）
+
+## 已完成
+
+- [x] 上下文感知（v1.7.0）
+- [x] 菜单栏状态反馈 → Toast 气泡通知（v1.7.0）
+- [x] 模型加载 UX 改进（v1.7.0）
+- [x] 白底 FlowBar 阴影裁剪
