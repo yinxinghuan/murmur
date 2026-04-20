@@ -39,6 +39,11 @@ codesign --force --deep --sign - "build/Murmur.app"
 echo ""
 echo "Done! App bundle at: build/Murmur.app"
 echo ""
-echo "To install:"
+echo "To install locally:"
 echo "  cp -R build/Murmur.app /Applications/"
 echo ""
+
+# Create DMG if version argument provided
+if [ -n "$1" ]; then
+    bash scripts/create_dmg.sh "$1"
+fi
