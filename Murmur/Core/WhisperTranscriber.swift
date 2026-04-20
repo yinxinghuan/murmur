@@ -67,8 +67,10 @@ final class WhisperTranscriber: @unchecked Sendable {
         }
     }
 
+    enum LoadPhase: String { case download, compile }
+
     /// Load a Whisper model by name
-    func loadModel(name: String, progress: @escaping @Sendable (Double) -> Void) async throws {
+    func loadModel(name: String, progress: @escaping @Sendable (Double) -> Void, phase: @escaping @Sendable (LoadPhase) -> Void = { _ in }) async throws {
         let modelBase = Self.modelBaseURL
         try FileManager.default.createDirectory(at: modelBase, withIntermediateDirectories: true)
 
@@ -108,8 +110,8 @@ final class WhisperTranscriber: @unchecked Sendable {
         if isModelDownloaded(name: name) {
             owLog("[Whisper] Model found locally: openai_whisper-\(name)")
             modelFolder = localModel
-            progress(0.8)
         } else {
+            phase(.download)
             // Clean any partial download first
             if FileManager.default.fileExists(atPath: localModel.path) {
                 owLog("[Whisper] Removing incomplete model before re-download")
@@ -121,14 +123,19 @@ final class WhisperTranscriber: @unchecked Sendable {
                 variant: "openai_whisper-\(name)",
                 downloadBase: modelBase
             ) { downloadProgress in
-                let pct = downloadProgress.fractionCompleted * 0.8
-                progress(pct)
+                progress(downloadProgress.fractionCompleted)
             }
             owLog("[Whisper] Download complete at: \(modelFolder.path)")
         }
 
-        // Load from local folder (80% → 100%)
-        progress(0.85)
+        // Compile CoreML model — can take 30-90s for large models
+        phase(.compile)
+        progress(0)
+        owLog("[Whisper] Compiling CoreML model (this may take a while for large models)...")
+
+        let progressTimer = ProgressTimer(from: 0.0, to: 0.95, duration: 60, callback: progress)
+        progressTimer.start()
+
         whisperKit = try await WhisperKit(
             modelFolder: modelFolder.path,
             verbose: false,
@@ -136,7 +143,10 @@ final class WhisperTranscriber: @unchecked Sendable {
             load: true,
             download: false
         )
+
+        progressTimer.stop()
         progress(1.0)
+        owLog("[Whisper] CoreML model compiled and loaded")
 
         // Delete other models to save disk space — only keep the active one
         removeOtherModels(keeping: name, in: modelBase)
@@ -307,5 +317,44 @@ enum TranscriberError: LocalizedError {
         switch self {
         case .modelNotLoaded: "Whisper model is not loaded."
         }
+    }
+}
+
+// MARK: - Progress Timer
+
+/// Animates progress from `from` to `to` over `duration` seconds, giving the user visual feedback
+/// during long operations (like CoreML compilation) that don't report their own progress.
+final class ProgressTimer: @unchecked Sendable {
+    private let from: Double
+    private let to: Double
+    private let duration: TimeInterval
+    private let callback: @Sendable (Double) -> Void
+    private var timer: Timer?
+    private let startTime = Date()
+
+    init(from: Double, to: Double, duration: TimeInterval, callback: @escaping @Sendable (Double) -> Void) {
+        self.from = from
+        self.to = to
+        self.duration = duration
+        self.callback = callback
+    }
+
+    func start() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                let elapsed = Date().timeIntervalSince(self.startTime)
+                let t = min(elapsed / self.duration, 1.0)
+                let eased = 1.0 - pow(1.0 - t, 3)
+                let value = self.from + (self.to - self.from) * eased
+                self.callback(value)
+            }
+        }
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
     }
 }

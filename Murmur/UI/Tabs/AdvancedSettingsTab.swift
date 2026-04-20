@@ -118,6 +118,16 @@ struct AdvancedSettingsTab: View {
                         ProtectedTermsView(terms: $appState.protectedTerms, zh: zh)
                     }
                 }
+
+                // ── Context-Aware Style Rules ──
+                if appState.llmCleanupEnabled && !appState.translateToEnglish {
+                    settingsCard(zh ? "上下文感知" : "Context-Aware") {
+                        AppStyleRulesView(rules: Binding(
+                            get: { appState.appStyleRules },
+                            set: { appState.appStyleRules = $0 }
+                        ), zh: zh)
+                    }
+                }
             }
             .padding(28)
         }

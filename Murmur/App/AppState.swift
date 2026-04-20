@@ -48,6 +48,11 @@ final class AppState {
     var customPolishPrompt: String {
         didSet { UserDefaults.standard.set(customPolishPrompt, forKey: "customPolishPrompt") }
     }
+    var appStyleRules: [String: String] {
+        didSet { UserDefaults.standard.set(appStyleRules, forKey: "appStyleRules") }
+    }
+    var activeStyleOverride: String?
+    var effectivePolishStyle: String { activeStyleOverride ?? polishStyle }
     var flowBarEnabled: Bool {
         didSet { UserDefaults.standard.set(flowBarEnabled, forKey: "flowBarEnabled") }
     }
@@ -98,8 +103,10 @@ final class AppState {
     var modelLoading: Bool = false
     var modelLoadProgress: Double = 0.0
     var modelIsDownloading: Bool = false
+    var modelLoadPhase: String = "" // "download" or "compile"
     var lastTranscription: String = ""
     var lastError: String?
+    var pasteFailed: Bool = false
     var transcriptionHistory: [TranscriptionRecord] = []
 
     struct TranscriptionRecord: Identifiable, Codable {
@@ -182,6 +189,7 @@ final class AppState {
         llmModel = defaults.string(forKey: "llmModel") ?? "qwen2.5:3b"
         polishStyle = defaults.string(forKey: "polishStyle") ?? "auto"
         customPolishPrompt = defaults.string(forKey: "customPolishPrompt") ?? ""
+        appStyleRules = defaults.dictionary(forKey: "appStyleRules") as? [String: String] ?? [:]
         flowBarEnabled = defaults.object(forKey: "flowBarEnabled") as? Bool ?? true
         flowBarTheme = defaults.string(forKey: "flowBarTheme") ?? "voiceFirst"
         translateToEnglish = defaults.object(forKey: "translateToEnglish") as? Bool ?? false
@@ -305,13 +313,18 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         let task = Task {
             do {
                 try Task.checkCancellation()
-                try await transcriber?.loadModel(name: targetModel) { [weak self] progress in
+                try await transcriber?.loadModel(name: targetModel, progress: { [weak self] progress in
                     Task { @MainActor in
-                        // Only update progress if this model is still the target
                         guard self?.whisperModel == targetModel else { return }
                         self?.modelLoadProgress = progress
                     }
-                }
+                }, phase: { [weak self] phase in
+                    Task { @MainActor in
+                        guard self?.whisperModel == targetModel else { return }
+                        self?.modelLoadPhase = phase.rawValue
+                        self?.modelLoadProgress = 0
+                    }
+                })
                 try Task.checkCancellation()
 
                 // Verify we're still loading this model (user may have switched)
@@ -376,6 +389,16 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         return nil
     }
 
+    /// Cancel model loading
+    func cancelModelLoad() {
+        modelLoadTask?.cancel()
+        modelLoadTask = nil
+        modelLoading = false
+        modelLoadProgress = 0
+        modelLoadPhase = ""
+        owLog("[Murmur] Model load cancelled by user")
+    }
+
     /// Retry: delete corrupted model and re-download
     func retryModelDownload() {
         transcriber?.deleteModel(name: whisperModel)
@@ -420,6 +443,15 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         // so we can re-activate it when pasting the transcription
         targetApp = NSWorkspace.shared.frontmostApplication
         owLog("[Murmur] Target app: \(targetApp?.localizedName ?? "unknown")")
+
+        // Context-aware: override polish style if app has a rule
+        if let bundleId = targetApp?.bundleIdentifier,
+           let ruleStyle = appStyleRules[bundleId] {
+            activeStyleOverride = ruleStyle
+            owLog("[Murmur] Context-aware style: \(ruleStyle) for \(bundleId)")
+        } else {
+            activeStyleOverride = nil
+        }
 
         recordingState = .recording
         recordingDuration = 0
@@ -583,7 +615,8 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
                     }
                 } else {
                     let rawText = text
-                    let style = PolishStyle(rawValue: polishStyle) ?? .auto
+                    let effectiveStyle = activeStyleOverride ?? polishStyle
+                    let style = PolishStyle(rawValue: effectiveStyle) ?? .auto
                     if llmCleanupEnabled && ollamaAvailable && !translateToEnglish {
                         text = await llmCleanup?.cleanup(
                             text: text,
@@ -598,8 +631,26 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
                     lastTranscription = text
                     addToHistory(raw: rawText, cleaned: text)
 
+                    pasteFailed = false
                     if autoPasteEnabled {
-                        textInjector?.pasteText(text, targetApp: targetApp)
+                        if AXIsProcessTrusted() {
+                            textInjector?.pasteText(text, targetApp: targetApp)
+                        } else {
+                            pasteFailed = true
+                            let clipText = text
+                            let zh = uiLanguage == "zh"
+                            ToastController.shared.show(
+                                zh ? "自动复制失败" : "Auto-paste failed",
+                                content: clipText,
+                                icon: "exclamationmark.triangle.fill",
+                                style: .warning,
+                                duration: 8.0,
+                                actionLabel: zh ? "复制" : "Copy"
+                            ) {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(clipText, forType: .string)
+                            }
+                        }
                     } else {
                         textInjector?.copyToClipboard(text)
                     }
@@ -608,10 +659,18 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
             } catch {
                 owLog("[Murmur] Error: \(error)")
                 lastError = error.localizedDescription
+                let zh = uiLanguage == "zh"
+                ToastController.shared.show(
+                    zh ? "转写失败：\(error.localizedDescription)" : "Transcription failed: \(error.localizedDescription)",
+                    icon: "xmark.circle.fill",
+                    style: .error,
+                    duration: 5.0
+                )
                 playSound("Sosumi", volume: 0.2)
             }
 
             recordingState = .idle
+            activeStyleOverride = nil
             resumeSystemMedia()
             hideFlowBarAfterDelay()
         }
@@ -650,6 +709,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         recordingTimer?.invalidate()
         recordingTimer = nil
         recordingState = .idle
+        activeStyleOverride = nil
         resumeSystemMedia()
         playSound("Funk", volume: 0.2)
         hideFlowBarAfterDelay(0.3)

@@ -261,6 +261,10 @@ private struct HomeHistoryRow: View {
                     .font(.system(size: 12))
                     .foregroundStyle(.quaternary)
                     .layoutPriority(1)
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 11))
+                    .foregroundStyle(isHovered ? .secondary : .quaternary)
+                    .padding(.leading, 8)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)

@@ -70,11 +70,13 @@ struct StyleBadgeButton: View {
 struct MinimalFlowBar: View {
     @Environment(AppState.self) var appState
     @State private var showDone = false
+    @State private var showFailed = false
     @State private var stopPulse = false
 
     private var isToggleMode: Bool { appState.dictationMode == "toggle" }
 
     private var state: BarState {
+        if showFailed { return .failed }
         if showDone { return .done }
         switch appState.recordingState {
         case .idle: return .hidden
@@ -87,16 +89,16 @@ struct MinimalFlowBar: View {
         ZStack {
             // Recording
             HStack(spacing: 10) {
-                // Toggle mode: show stop indicator
                 if isToggleMode {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(.white)
                         .frame(width: 10, height: 10)
                         .opacity(stopPulse ? 1.0 : 0.4)
                 }
-                if appState.llmCleanupEnabled && appState.polishStyle != "auto" {
-                    StyleBadgeButton(style: appState.polishStyle, zh: appState.uiLanguage == "zh") {
-                        appState.polishStyle = nextPolishStyle(appState.polishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
+                if appState.llmCleanupEnabled && appState.effectivePolishStyle != "auto" {
+                    StyleBadgeButton(style: appState.effectivePolishStyle, zh: appState.uiLanguage == "zh") {
+                        let next = nextPolishStyle(appState.effectivePolishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
+                        if appState.activeStyleOverride != nil { appState.activeStyleOverride = next } else { appState.polishStyle = next }
                     }
                 }
                 AudioBars(level: appState.audioLevel, barWidth: 3, barMaxH: 16)
@@ -110,9 +112,10 @@ struct MinimalFlowBar: View {
 
             // Transcribing
             HStack(spacing: 12) {
-                if appState.llmCleanupEnabled && appState.polishStyle != "auto" {
-                    StyleBadgeButton(style: appState.polishStyle, zh: appState.uiLanguage == "zh") {
-                        appState.polishStyle = nextPolishStyle(appState.polishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
+                if appState.llmCleanupEnabled && appState.effectivePolishStyle != "auto" {
+                    StyleBadgeButton(style: appState.effectivePolishStyle, zh: appState.uiLanguage == "zh") {
+                        let next = nextPolishStyle(appState.effectivePolishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
+                        if appState.activeStyleOverride != nil { appState.activeStyleOverride = next } else { appState.polishStyle = next }
                     }
                 }
                 ShimmerBar(color: .white)
@@ -126,12 +129,23 @@ struct MinimalFlowBar: View {
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(.white)
                 .opacity(state == .done ? 1 : 0)
+
+            // Failed
+            HStack(spacing: 6) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                Text(appState.uiLanguage == "zh" ? "复制失败" : "Paste failed")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+            }
+            .opacity(state == .failed ? 1 : 0)
         }
         .frame(height: 20)
         .padding(.leading, 18)
         .padding(.trailing, 12)
         .padding(.vertical, 9)
-        .background(Capsule().fill(.black))
+        .background(Capsule().fill(state == .failed ? Color(red: 0.65, green: 0.12, blue: 0.12) : .black))
         .onAppear {
             withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
                 stopPulse = true
@@ -139,9 +153,16 @@ struct MinimalFlowBar: View {
         }
         .onChange(of: appState.recordingState) { old, new in
             if old == .transcribing && new == .idle {
-                showDone = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    showDone = false
+                if appState.pasteFailed {
+                    showFailed = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        showFailed = false
+                    }
+                } else {
+                    showDone = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        showDone = false
+                    }
                 }
             }
         }
@@ -157,8 +178,10 @@ struct MinimalFlowBar: View {
 struct OutlineFlowBar: View {
     @Environment(AppState.self) var appState
     @State private var showDone = false
+    @State private var showFailed = false
 
     private var state: BarState {
+        if showFailed { return .failed }
         if showDone { return .done }
         switch appState.recordingState {
         case .idle: return .hidden
@@ -190,21 +213,36 @@ struct OutlineFlowBar: View {
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(.white)
                 .opacity(state == .done ? 1 : 0)
+
+            HStack(spacing: 6) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                Text(appState.uiLanguage == "zh" ? "复制失败" : "Paste failed")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+            }
+            .opacity(state == .failed ? 1 : 0)
         }
         .frame(height: 20)
         .padding(.horizontal, 18)
         .padding(.vertical, 9)
         .background(
             ZStack {
-                Capsule().fill(.black.opacity(0.85))
-                Capsule().strokeBorder(.white.opacity(0.5), lineWidth: 1)
+                Capsule().fill(state == .failed ? Color(red: 0.65, green: 0.12, blue: 0.12) : .black.opacity(0.85))
+                if state != .failed {
+                    Capsule().strokeBorder(.white.opacity(0.5), lineWidth: 1)
+                }
             }
         )
         .onChange(of: appState.recordingState) { old, new in
             if old == .transcribing && new == .idle {
-                showDone = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    showDone = false
+                if appState.pasteFailed {
+                    showFailed = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { showFailed = false }
+                } else {
+                    showDone = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { showDone = false }
                 }
             }
         }
@@ -220,11 +258,13 @@ struct OutlineFlowBar: View {
 struct InvertFlowBar: View {
     @Environment(AppState.self) var appState
     @State private var showDone = false
+    @State private var showFailed = false
     @State private var stopPulse = false
 
     private var isToggleMode: Bool { appState.dictationMode == "toggle" }
 
     private var state: BarState {
+        if showFailed { return .failed }
         if showDone { return .done }
         switch appState.recordingState {
         case .idle: return .hidden
@@ -242,9 +282,10 @@ struct InvertFlowBar: View {
                         .frame(width: 10, height: 10)
                         .opacity(stopPulse ? 1.0 : 0.4)
                 }
-                if appState.llmCleanupEnabled && appState.polishStyle != "auto" {
-                    StyleBadgeButton(style: appState.polishStyle, zh: appState.uiLanguage == "zh", darkContent: true) {
-                        appState.polishStyle = nextPolishStyle(appState.polishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
+                if appState.llmCleanupEnabled && appState.effectivePolishStyle != "auto" {
+                    StyleBadgeButton(style: appState.effectivePolishStyle, zh: appState.uiLanguage == "zh", darkContent: true) {
+                        let next = nextPolishStyle(appState.effectivePolishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
+                        if appState.activeStyleOverride != nil { appState.activeStyleOverride = next } else { appState.polishStyle = next }
                     }
                 }
                 AudioBars(level: appState.audioLevel, color: .black, barWidth: 3, barMaxH: 16)
@@ -257,9 +298,10 @@ struct InvertFlowBar: View {
             .opacity(state == .recording ? 1 : 0)
 
             HStack(spacing: 12) {
-                if appState.llmCleanupEnabled && appState.polishStyle != "auto" {
-                    StyleBadgeButton(style: appState.polishStyle, zh: appState.uiLanguage == "zh", darkContent: true) {
-                        appState.polishStyle = nextPolishStyle(appState.polishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
+                if appState.llmCleanupEnabled && appState.effectivePolishStyle != "auto" {
+                    StyleBadgeButton(style: appState.effectivePolishStyle, zh: appState.uiLanguage == "zh", darkContent: true) {
+                        let next = nextPolishStyle(appState.effectivePolishStyle, hasCustomPrompt: !appState.customPolishPrompt.isEmpty)
+                        if appState.activeStyleOverride != nil { appState.activeStyleOverride = next } else { appState.polishStyle = next }
                     }
                 }
                 ShimmerBar(color: .black)
@@ -272,6 +314,16 @@ struct InvertFlowBar: View {
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(.black)
                 .opacity(state == .done ? 1 : 0)
+
+            HStack(spacing: 6) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                Text(appState.uiLanguage == "zh" ? "复制失败" : "Paste failed")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+            }
+            .opacity(state == .failed ? 1 : 0)
         }
         .frame(height: 20)
         .padding(.leading, 18)
@@ -279,14 +331,17 @@ struct InvertFlowBar: View {
         .padding(.vertical, 9)
         .background(
             Capsule()
-                .fill(.white)
+                .fill(state == .failed ? Color(red: 0.65, green: 0.12, blue: 0.12) : .white)
                 .shadow(color: .black.opacity(0.25), radius: 10, y: 3)
         )
         .onChange(of: appState.recordingState) { old, new in
             if old == .transcribing && new == .idle {
-                showDone = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    showDone = false
+                if appState.pasteFailed {
+                    showFailed = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { showFailed = false }
+                } else {
+                    showDone = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { showDone = false }
                 }
             }
         }
@@ -304,7 +359,7 @@ struct InvertFlowBar: View {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private enum BarState: Equatable {
-    case hidden, recording, transcribing, done
+    case hidden, recording, transcribing, done, failed
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

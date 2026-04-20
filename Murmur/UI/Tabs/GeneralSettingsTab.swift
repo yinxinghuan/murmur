@@ -167,10 +167,33 @@ struct GeneralSettingsTab: View {
     @ViewBuilder
     private var modelStatus: some View {
         if appState.modelLoading {
-            HStack(spacing: 6) {
-                ProgressView(value: appState.modelLoadProgress).frame(maxWidth: .infinity)
-                Text("\(Int(appState.modelLoadProgress * 100))%")
-                    .font(.caption).foregroundStyle(.secondary).frame(width: 32, alignment: .trailing)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    if appState.modelLoadPhase == "compile" {
+                        Text(zh ? "编译模型…" : "Compiling…")
+                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                    } else if appState.modelLoadPhase == "download" {
+                        Text(zh ? "下载中…" : "Downloading…")
+                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
+                    ProgressView(value: appState.modelLoadProgress).frame(maxWidth: .infinity)
+                    Text("\(Int(appState.modelLoadProgress * 100))%")
+                        .font(.caption).foregroundStyle(.secondary).frame(width: 32, alignment: .trailing)
+                    Button {
+                        appState.cancelModelLoad()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(zh ? "取消" : "Cancel")
+                }
+                if appState.modelLoadPhase == "compile" {
+                    Text(zh ? "首次加载需要编译，可能需要 1-2 分钟" : "First load requires compilation, may take 1-2 min")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.quaternary)
+                }
             }
             .padding(.vertical, 4)
             .padding(.leading, 28)
