@@ -3,6 +3,9 @@ import SwiftUI
 struct ProtectedTermsView: View {
     @Binding var terms: [String]
     let zh: Bool
+    var onAcceptSuggestion: ((String) -> Void)?
+    var onDismissSuggestion: ((String) -> Void)?
+    var smartSuggestions: [String: Int] = [:]
     @State private var inputText = ""
 
     // Suggested terms — common technical terms that Whisper/LLM often mangle
@@ -17,6 +20,14 @@ struct ProtectedTermsView: View {
     /// Suggestions not already added
     private var availableSuggestions: [String] {
         Self.suggestions.filter { !terms.contains($0) }
+    }
+
+    /// Smart suggestions sorted by count, excluding already protected terms
+    private var sortedSmartSuggestions: [(term: String, count: Int)] {
+        smartSuggestions
+            .filter { !terms.contains($0.key) }
+            .map { (term: $0.key, count: $0.value) }
+            .sorted { $0.count > $1.count }
     }
 
     var body: some View {
@@ -48,6 +59,19 @@ struct ProtectedTermsView: View {
                     }
                     .buttonStyle(.plain)
                     .help(zh ? "清空所有" : "Clear all")
+                }
+            }
+
+            // Smart suggestions (detected from usage)
+            if !sortedSmartSuggestions.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(zh ? "检测到可能需要保护的术语" : "Detected terms that may need protection")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                    FlowLayout(spacing: 3) {
+                        ForEach(sortedSmartSuggestions, id: \.term) { item in
+                            smartSuggestionPill(term: item.term, count: item.count)
+                        }
+                    }
                 }
             }
 
@@ -85,6 +109,50 @@ struct ProtectedTermsView: View {
     }
 
     // MARK: - Components
+
+    private func smartSuggestionPill(term: String, count: Int) -> some View {
+        HStack(spacing: 4) {
+            Text(term)
+                .font(.system(size: 10, design: .monospaced))
+            if count > 1 {
+                Text("×\(count)")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    onAcceptSuggestion?(term)
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.green)
+            }
+            .buttonStyle(.plain)
+            .help(zh ? "添加保护" : "Add protection")
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    onDismissSuggestion?(term)
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(zh ? "忽略" : "Dismiss")
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.orange.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(Color.orange.opacity(0.3), lineWidth: 0.5)
+                )
+        )
+    }
 
     private func termPill(_ term: String) -> some View {
         HStack(spacing: 3) {

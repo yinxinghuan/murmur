@@ -288,7 +288,13 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                             .frame(width: R, alignment: .trailing)
                     }
-                    ProtectedTermsView(terms: $appState.protectedTerms, zh: zh)
+                    ProtectedTermsView(
+                        terms: $appState.protectedTerms,
+                        zh: zh,
+                        onAcceptSuggestion: { appState.acceptSuggestedTerm($0) },
+                        onDismissSuggestion: { appState.dismissSuggestedTerm($0) },
+                        smartSuggestions: appState.suggestedTerms
+                    )
                         .padding(.leading, 12)
                 }
             }

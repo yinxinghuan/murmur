@@ -115,7 +115,13 @@ struct AdvancedSettingsTab: View {
                 // ── Protected Terms ──
                 if appState.llmCleanupEnabled && !appState.translateToEnglish {
                     settingsCard(zh ? "术语保护" : "Protected Terms") {
-                        ProtectedTermsView(terms: $appState.protectedTerms, zh: zh)
+                        ProtectedTermsView(
+                            terms: $appState.protectedTerms,
+                            zh: zh,
+                            onAcceptSuggestion: { appState.acceptSuggestedTerm($0) },
+                            onDismissSuggestion: { appState.dismissSuggestedTerm($0) },
+                            smartSuggestions: appState.suggestedTerms
+                        )
                     }
                 }
 

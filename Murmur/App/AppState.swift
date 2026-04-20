@@ -39,6 +39,10 @@ final class AppState {
     var protectedTerms: [String] {
         didSet { UserDefaults.standard.set(protectedTerms, forKey: "protectedTerms") }
     }
+    /// Terms detected from raw/cleaned diff, with occurrence count. Key = term, Value = count.
+    var suggestedTerms: [String: Int] {
+        didSet { UserDefaults.standard.set(suggestedTerms, forKey: "suggestedTerms") }
+    }
     var llmModel: String {
         didSet { UserDefaults.standard.set(llmModel, forKey: "llmModel") }
     }
@@ -186,6 +190,7 @@ final class AppState {
         } else {
             protectedTerms = defaults.stringArray(forKey: "protectedTerms") ?? []
         }
+        suggestedTerms = defaults.dictionary(forKey: "suggestedTerms") as? [String: Int] ?? [:]
         llmModel = defaults.string(forKey: "llmModel") ?? "qwen2.5:3b"
         polishStyle = defaults.string(forKey: "polishStyle") ?? "auto"
         customPolishPrompt = defaults.string(forKey: "customPolishPrompt") ?? ""
@@ -726,7 +731,97 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
             transcriptionHistory = Array(transcriptionHistory.prefix(Self.maxHistory))
         }
         saveHistory()
+        detectModifiedTerms(raw: raw, cleaned: cleaned)
     }
+
+    // MARK: - Smart Term Detection
+
+    /// Compare raw and cleaned text to find terms that were modified by LLM cleanup.
+    /// Focuses on English words, camelCase, acronyms, and technical terms.
+    private func detectModifiedTerms(raw: String, cleaned: String) {
+        guard raw != cleaned else { return }
+
+        let rawTokens = extractTermCandidates(from: raw)
+        let cleanedLower = cleaned.lowercased()
+
+        for token in rawTokens {
+            // Skip if already protected or already suggested with high count
+            if protectedTerms.contains(token) { continue }
+
+            // Check if this token was changed or removed in the cleaned version
+            if !cleaned.contains(token) && !cleanedLower.contains(token.lowercased()) {
+                // Token was removed entirely — likely mangled
+                suggestedTerms[token, default: 0] += 1
+            } else if !cleaned.contains(token) && cleanedLower.contains(token.lowercased()) {
+                // Case was changed (e.g. "SwiftUI" → "swiftui" or "Swift UI")
+                suggestedTerms[token, default: 0] += 1
+            }
+        }
+
+        // Prune low-count old suggestions (keep top 20)
+        if suggestedTerms.count > 20 {
+            let sorted = suggestedTerms.sorted { $0.value > $1.value }
+            suggestedTerms = Dictionary(uniqueKeysWithValues: Array(sorted.prefix(20)))
+        }
+    }
+
+    /// Extract English/technical term candidates from text.
+    private func extractTermCandidates(from text: String) -> Set<String> {
+        var candidates = Set<String>()
+
+        // Match: English words 2+ chars, camelCase, acronyms, dotted terms (Node.js)
+        let pattern = #"[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)?"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return candidates }
+
+        let nsText = text as NSString
+        let matches = regex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
+
+        for match in matches {
+            let token = nsText.substring(with: match.range)
+            // Skip very short or common English words
+            if token.count < 3 { continue }
+            if Self.commonWords.contains(token.lowercased()) { continue }
+
+            // Keep if: has uppercase in middle (camelCase), all caps (acronym), or has dot
+            let hasMidUppercase = token.dropFirst().contains(where: { $0.isUppercase })
+            let isAllCaps = token == token.uppercased() && token.count >= 3
+            let hasDot = token.contains(".")
+            let startsWithCap = token.first?.isUppercase == true
+
+            if hasMidUppercase || isAllCaps || hasDot || startsWithCap {
+                candidates.insert(token)
+            }
+        }
+        return candidates
+    }
+
+    func acceptSuggestedTerm(_ term: String) {
+        protectedTerms.append(term)
+        suggestedTerms[term] = nil
+    }
+
+    func dismissSuggestedTerm(_ term: String) {
+        suggestedTerms[term] = nil
+    }
+
+    private static let commonWords: Set<String> = [
+        "the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "her", "was",
+        "one", "our", "out", "has", "his", "how", "its", "let", "may", "new", "now", "old",
+        "see", "way", "who", "did", "get", "got", "him", "just", "know", "like", "make",
+        "many", "some", "than", "them", "then", "very", "when", "come", "could", "made",
+        "after", "back", "been", "before", "being", "between", "both", "came", "each",
+        "from", "have", "here", "into", "more", "most", "much", "must", "name", "never",
+        "only", "other", "over", "said", "same", "she", "should", "show", "side", "since",
+        "such", "take", "tell", "that", "their", "there", "these", "they", "this", "those",
+        "through", "too", "under", "upon", "what", "where", "which", "while", "will", "with",
+        "would", "your", "about", "also", "because", "been", "being", "between", "could",
+        "does", "done", "down", "even", "every", "first", "found", "give", "good", "great",
+        "help", "high", "home", "house", "keep", "kind", "last", "left", "life", "line",
+        "long", "look", "might", "need", "next", "number", "part", "people", "place",
+        "point", "right", "small", "still", "think", "time", "turn", "used", "want", "well",
+        "went", "were", "work", "world", "year", "yes", "test", "testing", "start",
+        "stop", "please", "okay", "hello", "right", "left", "sure", "thank", "thanks",
+    ]
 
     func clearHistory() {
         transcriptionHistory = []
@@ -808,7 +903,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     // MARK: - Update Check
 
-    static let currentVersion = "1.7.0"
+    static let currentVersion = "1.7.1"
 
     func checkForUpdate() async {
         guard let url = URL(string: "https://api.github.com/repos/yinxinghuan/murmur/releases/latest") else { return }
