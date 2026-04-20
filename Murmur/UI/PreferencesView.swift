@@ -131,9 +131,9 @@ struct MainWindowView: View {
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(selectedTab == tab ? Color.accentColor.opacity(0.12) : Color.clear)
+                    .fill(selectedTab == tab ? Color.primary.opacity(0.08) : Color.clear)
             )
-            .foregroundStyle(selectedTab == tab ? Color.accentColor : .primary)
+            .foregroundStyle(.primary)
         }
         .buttonStyle(SidebarButtonStyle(isSelected: selectedTab == tab))
     }

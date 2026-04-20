@@ -136,13 +136,10 @@ private struct HistoryListRow: View {
                 if isHovered {
                     HStack(spacing: 6) {
                         if record.raw != record.cleaned {
-                            Button(action: onToggleExpand) {
-                                Image(systemName: isExpanded ? "chevron.up" : "text.quote")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                            .help(zh ? "查看原文" : "Show raw")
+                            Image(systemName: isExpanded ? "chevron.up" : "text.quote")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .help(zh ? "查看原文" : "Show raw")
                         }
 
                         Button(action: onDelete) {
@@ -175,6 +172,11 @@ private struct HistoryListRow: View {
             )
             .contentShape(Rectangle())
             .onHover { isHovered = $0 }
+            .onTapGesture {
+                if record.raw != record.cleaned {
+                    onToggleExpand()
+                }
+            }
 
             // Expanded raw text
             if isExpanded && record.raw != record.cleaned {
