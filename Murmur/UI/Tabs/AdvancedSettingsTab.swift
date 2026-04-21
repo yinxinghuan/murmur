@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AdvancedSettingsTab: View {
     @Environment(AppState.self) var appState
+    @State private var showLLMDeleteConfirm = false
 
     private var zh: Bool { appState.uiLanguage == "zh" }
 
@@ -57,6 +58,27 @@ struct AdvancedSettingsTab: View {
                                 }
                                 .labelsHidden()
                                 .disabled(!appState.ollamaAvailable)
+                                if appState.installedLLMModels.contains(appState.llmModel) && !appState.llmPulling {
+                                    Button(action: { showLLMDeleteConfirm = true }) {
+                                        Image(systemName: "trash")
+                                            .foregroundStyle(.secondary)
+                                            .font(.system(size: 12))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help(zh ? "删除当前模型" : "Delete current model")
+                                    .alert(
+                                        zh ? "删除模型" : "Delete Model",
+                                        isPresented: $showLLMDeleteConfirm
+                                    ) {
+                                        Button(zh ? "删除" : "Delete", role: .destructive) {
+                                            let name = appState.llmModel
+                                            Task { await appState.deleteLLMModel(name: name) }
+                                        }
+                                        Button(zh ? "取消" : "Cancel", role: .cancel) {}
+                                    } message: {
+                                        Text(zh ? "确定要删除 \(appState.llmModel) 吗？下次使用需要重新下载。" : "Delete \(appState.llmModel)? You'll need to re-download it next time.")
+                                    }
+                                }
                                 Button(action: {
                                     let ollamaDir = FileManager.default.homeDirectoryForCurrentUser
                                         .appendingPathComponent(".ollama/models")

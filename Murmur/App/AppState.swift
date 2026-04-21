@@ -953,7 +953,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     // MARK: - Update Check
 
-    static let currentVersion = "1.7.3"
+    static let currentVersion = "1.7.4"
 
     func checkForUpdate() async {
         guard let url = URL(string: "https://api.github.com/repos/yinxinghuan/murmur/releases/latest") else { return }
@@ -969,6 +969,26 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
                 }
             }
         } catch {}
+    }
+
+    // MARK: - LLM Model Delete
+
+    func deleteLLMModel(name: String) async {
+        guard let url = URL(string: "http://localhost:11434/api/delete") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["name": name])
+        request.timeoutInterval = 10
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode == 200 {
+                owLog("[Murmur] Deleted LLM model: \(name)")
+                await refreshInstalledLLMModels()
+            }
+        } catch {
+            owLog("[Murmur] LLM delete error: \(error)")
+        }
     }
 
     // MARK: - LLM Model Pull
