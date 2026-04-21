@@ -11,14 +11,18 @@ struct MenuBarDropdownView: View {
         VStack(alignment: .leading, spacing: 10) {
 
             // ── Header ──
-            HStack(spacing: 10) {
-                MurmurLogo(color: Color.primary).frame(width: 36, height: 36)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Murmur").font(.system(size: 16, weight: .semibold))
-                    statusText
+            Button(action: { PreferencesWindowController.shared.show() }) {
+                HStack(spacing: 10) {
+                    MurmurLogo(color: Color.primary).frame(width: 36, height: 36)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Murmur").font(.system(size: 16, weight: .semibold))
+                        statusText
+                    }
+                    Spacer()
                 }
-                Spacer()
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
 
             Divider()
 

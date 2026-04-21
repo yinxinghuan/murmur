@@ -16,6 +16,35 @@ struct HomeTab: View {
     }
     private var totalCount: Int { appState.transcriptionHistory.count }
 
+    private func polishLabel(zh: Bool) -> String? {
+        guard appState.llmCleanupEnabled else { return nil }
+        switch appState.effectivePolishStyle {
+        case "spoken":     return zh ? "口语润色" : "Spoken polish"
+        case "concise":    return zh ? "精简润色" : "Concise polish"
+        case "structured": return zh ? "结构化润色" : "Structured polish"
+        case "custom":     return zh ? "自定义润色" : "Custom polish"
+        default:           return zh ? "自动润色" : "Auto polish"
+        }
+    }
+
+    private var heroSubtitle: String {
+        let isHold = appState.dictationMode == "hold"
+        let paste = appState.autoPasteEnabled
+        if zh {
+            let trigger = isHold ? "按住 Right ⌥ 说话，松开" : "按 Right ⌥ 开始说话，再按"
+            let output = paste ? "自动粘贴" : "复制到剪贴板"
+            var parts = "本地处理 · \(trigger)\(output)"
+            if let polish = polishLabel(zh: true) { parts += " · \(polish)" }
+            return parts
+        } else {
+            let trigger = isHold ? "Hold Right ⌥, release to" : "Press Right ⌥, press again to"
+            let output = paste ? "auto-paste" : "copy"
+            var parts = "Local · \(trigger) \(output)"
+            if let polish = polishLabel(zh: false) { parts += " · \(polish)" }
+            return parts
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
@@ -26,7 +55,7 @@ struct HomeTab: View {
                         .font(.system(size: 34, weight: .regular))
                         .lineSpacing(4)
 
-                    Text(zh ? "本地处理 · 按住 Right ⌥ 说话，松开自动粘贴" : "Local processing · Hold Right ⌥ to speak, release to paste")
+                    Text(heroSubtitle)
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
 
