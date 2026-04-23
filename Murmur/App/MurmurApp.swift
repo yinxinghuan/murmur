@@ -70,6 +70,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         Task { @MainActor in
             owLog("Starting setup...")
+            // Auto-open main window on first launch for onboarding
+            if AppState.shared.isFirstLaunch {
+                PreferencesWindowController.shared.show()
+            }
             await AppState.shared.setup()
         }
     }

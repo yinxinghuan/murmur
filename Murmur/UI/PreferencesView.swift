@@ -28,9 +28,17 @@ struct MainWindowView: View {
     private var zh: Bool { appState.uiLanguage == "zh" }
 
     var body: some View {
+        if appState.isFirstLaunch {
+            OnboardingView()
+        } else {
+            mainContent
+        }
+    }
+
+    private var mainContent: some View {
         @Bindable var appState = appState
 
-        HStack(spacing: 0) {
+        return HStack(spacing: 0) {
             // ── Sidebar ──
             VStack(spacing: 4) {
                 // Logo
