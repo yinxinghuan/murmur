@@ -154,7 +154,7 @@ struct HomeTab: View {
                     HStack(spacing: 10) {
                         shortcutCard(key: "⌥", desc: zh ? "按住说话" : "Hold to talk")
                         shortcutCard(key: "Esc", desc: zh ? "取消" : "Cancel")
-                        shortcutCard(key: "⌘,", desc: zh ? "设置" : "Settings")
+                        menuBarCard(desc: zh ? "菜单栏" : "Menu bar")
                     }
                 }
             }
@@ -199,6 +199,31 @@ struct HomeTab: View {
         VStack(spacing: 10) {
             Text(key)
                 .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                .frame(width: 44, height: 36)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.primary.opacity(0.06))
+                )
+            Text(desc)
+                .font(.system(size: 12))
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 18)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.primary.opacity(0.02))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color.primary.opacity(0.04), lineWidth: 1)
+                )
+        )
+    }
+
+    private func menuBarCard(desc: String) -> some View {
+        VStack(spacing: 10) {
+            MurmurLogo(color: .primary)
+                .frame(width: 22, height: 22)
                 .frame(width: 44, height: 36)
                 .background(
                     RoundedRectangle(cornerRadius: 8)

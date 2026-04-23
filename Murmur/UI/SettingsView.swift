@@ -30,11 +30,8 @@ struct SettingsView: View {
                 .frame(width: 72)
             }
 
-            // ── Onboarding ──
-            if appState.isFirstLaunch { onboardingCard }
-
             // ── Permission warnings ──
-            if !appState.isFirstLaunch && (!appState.microphoneGranted || !appState.accessibilityGranted) {
+            if !appState.microphoneGranted || !appState.accessibilityGranted {
                 permissionWarnings
             }
 
@@ -392,70 +389,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Onboarding
-
-    private var onboardingCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(zh ? "快速开始" : "Quick Start").font(.system(size: 14, weight: .semibold))
-
-            HStack(alignment: .top, spacing: 10) {
-                stepCircle("1", done: false)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(zh ? "按住右 ⌥ 说话" : "Hold Right ⌥ to speak").font(.system(size: 13, weight: .medium))
-                    Text(zh ? "松开后文字自动粘贴到光标处" : "Release to auto-paste at cursor")
-                        .font(.system(size: 12)).foregroundStyle(.secondary)
-                }
-            }
-
-            HStack(alignment: .top, spacing: 10) {
-                stepCircle("2", done: appState.microphoneGranted && appState.accessibilityGranted)
-                VStack(alignment: .leading, spacing: 4) {
-                    if appState.microphoneGranted && appState.accessibilityGranted {
-                        Text(zh ? "权限已就绪" : "Permissions ready")
-                            .font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
-                    } else {
-                        Text(zh ? "授予权限" : "Grant permissions").font(.system(size: 13, weight: .medium))
-                        if !appState.microphoneGranted {
-                            Button(zh ? "→ 麦克风权限" : "→ Microphone") {
-                                openSystemSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
-                            }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Color.accentColor)
-                        }
-                        if !appState.accessibilityGranted {
-                            Button(zh ? "→ 辅助功能权限" : "→ Accessibility") {
-                                openSystemSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-                            }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Color.accentColor)
-                        }
-                    }
-                }
-            }
-
-            HStack(alignment: .top, spacing: 10) {
-                stepCircle("3", done: appState.modelLoaded)
-                if appState.modelLoaded {
-                    Text(zh ? "模型已就绪" : "Model ready")
-                        .font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
-                } else if appState.modelLoading {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(zh ? "模型下载中 \(Int(appState.modelLoadProgress * 100))%" : "Downloading \(Int(appState.modelLoadProgress * 100))%")
-                            .font(.system(size: 13, weight: .medium))
-                        ProgressView(value: appState.modelLoadProgress).frame(maxWidth: .infinity)
-                    }
-                } else {
-                    Text(zh ? "请在下方选择模型" : "Select a model below")
-                        .font(.system(size: 13, weight: .medium))
-                }
-            }
-
-            if appState.modelLoaded && appState.microphoneGranted && appState.accessibilityGranted {
-                Button(zh ? "开始使用" : "Get Started") { appState.dismissOnboarding() }
-                    .buttonStyle(.borderedProminent).controlSize(.regular)
-                    .frame(maxWidth: .infinity).padding(.top, 4)
-            }
-        }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.accentColor.opacity(0.06)))
-    }
-
     // MARK: - Permission Warnings
 
     private var permissionWarnings: some View {
@@ -472,20 +405,6 @@ struct SettingsView: View {
     }
 
     // MARK: - Helpers
-
-    private func stepCircle(_ num: String, done: Bool) -> some View {
-        Group {
-            if done {
-                Image(systemName: "checkmark").font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white).frame(width: 22, height: 22)
-                    .background(Circle().fill(Color.primary))
-            } else {
-                Text(num).font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white).frame(width: 22, height: 22)
-                    .background(Circle().fill(Color.accentColor))
-            }
-        }
-    }
 
     private func permissionWarning(_ text: String, action: @escaping () -> Void) -> some View {
         HStack(spacing: 8) {

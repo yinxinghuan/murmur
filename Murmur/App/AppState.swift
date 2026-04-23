@@ -270,10 +270,14 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         hotkey?.register()
         owLog("[Murmur] Hotkey registered (Right Option)")
 
-        // Load Whisper model
-        owLog("[Murmur] Loading model: \(whisperModel)...")
-        await loadModel()
-        owLog("[Murmur] Model loaded: \(modelLoaded)")
+        // Load Whisper model (skip on first launch — onboarding handles it)
+        if !isFirstLaunch {
+            owLog("[Murmur] Loading model: \(whisperModel)...")
+            await loadModel()
+            owLog("[Murmur] Model loaded: \(modelLoaded)")
+        } else {
+            owLog("[Murmur] First launch — skipping auto model load, onboarding will handle it")
+        }
 
         // Check Ollama availability and pull LLM model if needed
         ollamaAvailable = await LLMCleanup.checkAvailability()
@@ -296,6 +300,8 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     func dismissOnboarding() {
         isFirstLaunch = false
+        UserDefaults.standard.set(true, forKey: "hasLaunched")
+        PreferencesWindowController.shared.resizeToMain()
     }
 
     private let modelFallbackOrder = ["large-v3_turbo", "large-v3", "small", "base", "tiny"]
