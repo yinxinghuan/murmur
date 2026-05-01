@@ -8,7 +8,15 @@ final class AudioEngine: @unchecked Sendable {
     private var samples: [Float] = []
     private var inputSampleRate: Double = 48000
     private var levelCallback: ((Float) -> Void)?
-    private var deviceChangeListener: NSObjectProtocol?
+    private var deviceListenerBlock: AudioObjectPropertyListenerBlock?
+
+    init() {
+        installDefaultInputDeviceListener()
+    }
+
+    deinit {
+        removeDefaultInputDeviceListener()
+    }
 
     /// Request microphone permission (call before first recording)
     func requestPermission() async -> Bool {
@@ -32,10 +40,21 @@ final class AudioEngine: @unchecked Sendable {
         engine.reset()
         engine = AVAudioEngine()
 
+        // AVAudioEngine on macOS does NOT auto-track the system's default input device —
+        // the AUHAL remains bound to whatever device was current when the audio unit was
+        // first created. Explicitly bind it now so plugging in Bluetooth headphones or
+        // switching mics in System Settings is honored from the next recording onward.
         let inputNode = engine.inputNode
+        if let deviceID = Self.currentDefaultInputDevice() {
+            Self.setInputNodeDevice(inputNode, deviceID: deviceID)
+            owLog("[AudioEngine] Bound input to device \(deviceID) (\(Self.deviceName(deviceID) ?? "unknown"))")
+        } else {
+            owLog("[AudioEngine] No default input device found — falling back to AVAudioEngine default")
+        }
+
         let format = inputNode.outputFormat(forBus: 0)
         inputSampleRate = format.sampleRate
-        owLog("[AudioEngine] Recording format: \(format.sampleRate)Hz, \(format.channelCount)ch, device: \(inputNode.auAudioUnit.deviceID)")
+        owLog("[AudioEngine] Recording format: \(format.sampleRate)Hz, \(format.channelCount)ch")
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
             guard let self else { return }
@@ -142,5 +161,101 @@ final class AudioEngine: @unchecked Sendable {
         }
 
         return Array(UnsafeBufferPointer(start: channelData, count: Int(outputBuffer.frameLength)))
+    }
+
+    // MARK: - CoreAudio device helpers
+
+    /// Query the system default input device. Returns nil if none is available.
+    static func currentDefaultInputDevice() -> AudioDeviceID? {
+        var deviceID: AudioDeviceID = 0
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address, 0, nil, &size, &deviceID
+        )
+        guard status == noErr, deviceID != kAudioObjectUnknown else { return nil }
+        return deviceID
+    }
+
+    static func deviceName(_ deviceID: AudioDeviceID) -> String? {
+        var name: CFString = "" as CFString
+        var size = UInt32(MemoryLayout<CFString?>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioObjectPropertyName,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let status = withUnsafeMutablePointer(to: &name) { ptr -> OSStatus in
+            ptr.withMemoryRebound(to: CFString?.self, capacity: 1) { rebound in
+                AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, rebound)
+            }
+        }
+        guard status == noErr else { return nil }
+        return name as String
+    }
+
+    /// Bind the AUHAL audio unit behind `inputNode` to `deviceID`.
+    private static func setInputNodeDevice(_ inputNode: AVAudioInputNode, deviceID: AudioDeviceID) {
+        let audioUnit = inputNode.audioUnit
+        guard let unit = audioUnit else {
+            owLog("[AudioEngine] inputNode has no audio unit — cannot bind device")
+            return
+        }
+        var device = deviceID
+        let status = AudioUnitSetProperty(
+            unit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &device,
+            UInt32(MemoryLayout<AudioDeviceID>.size)
+        )
+        if status != noErr {
+            owLog("[AudioEngine] AudioUnitSetProperty(CurrentDevice) failed: \(status)")
+        }
+    }
+
+    // MARK: - Default input device change listener
+
+    private func installDefaultInputDeviceListener() {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let block: AudioObjectPropertyListenerBlock = { _, _ in
+            if let id = Self.currentDefaultInputDevice() {
+                owLog("[AudioEngine] Default input device changed → \(id) (\(Self.deviceName(id) ?? "unknown"))")
+            } else {
+                owLog("[AudioEngine] Default input device changed → none")
+            }
+        }
+        deviceListenerBlock = block
+        let status = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address, DispatchQueue.main, block
+        )
+        if status != noErr {
+            owLog("[AudioEngine] Failed to install device listener: \(status)")
+        }
+    }
+
+    private func removeDefaultInputDeviceListener() {
+        guard let block = deviceListenerBlock else { return }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        AudioObjectRemovePropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address, DispatchQueue.main, block
+        )
+        deviceListenerBlock = nil
     }
 }
