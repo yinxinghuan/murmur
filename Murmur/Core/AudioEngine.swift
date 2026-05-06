@@ -10,6 +10,13 @@ final class AudioEngine: @unchecked Sendable {
     private var levelCallback: ((Float) -> Void)?
     private var deviceListenerBlock: AudioObjectPropertyListenerBlock?
 
+    // Serial queue for ALL CoreAudio / AVAudioEngine HAL calls.
+    // The main thread must never block on engine.stop()/start() — when AUHAL
+    // gets stuck on a dead device, the RPC can hang for tens of seconds and
+    // freeze the global hotkey monitor along with it (see /tmp/murmur.log
+    // 2026-05-05 22:38:26 incident).
+    private let audioQueue = DispatchQueue(label: "com.yinxinghuan.murmur.audio")
+
     init() {
         installDefaultInputDeviceListener()
     }
@@ -35,65 +42,92 @@ final class AudioEngine: @unchecked Sendable {
         samples = []
         lock.unlock()
 
-        // Reset engine to pick up current default input device
-        engine.stop()
-        engine.reset()
-        engine = AVAudioEngine()
-
-        // AVAudioEngine on macOS does NOT auto-track the system's default input device —
-        // the AUHAL remains bound to whatever device was current when the audio unit was
-        // first created. Explicitly bind it now so plugging in Bluetooth headphones or
-        // switching mics in System Settings is honored from the next recording onward.
-        let inputNode = engine.inputNode
-        if let deviceID = Self.currentDefaultInputDevice() {
-            Self.setInputNodeDevice(inputNode, deviceID: deviceID)
-            owLog("[AudioEngine] Bound input to device \(deviceID) (\(Self.deviceName(deviceID) ?? "unknown"))")
-        } else {
-            owLog("[AudioEngine] No default input device found — falling back to AVAudioEngine default")
-        }
-
-        let format = inputNode.outputFormat(forBus: 0)
-        inputSampleRate = format.sampleRate
-        owLog("[AudioEngine] Recording format: \(format.sampleRate)Hz, \(format.channelCount)ch")
-
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
+        audioQueue.async { [weak self] in
             guard let self else { return }
-            guard let channelData = buffer.floatChannelData?[0] else { return }
-            let frameLength = Int(buffer.frameLength)
+            owLog("[AudioEngine] start: stopping previous engine")
+            self.engine.stop()
+            owLog("[AudioEngine] start: resetting")
+            self.engine.reset()
+            owLog("[AudioEngine] start: rebuilding engine")
+            self.engine = AVAudioEngine()
 
-            // Calculate RMS level
-            var rms: Float = 0
-            vDSP_rmsqv(channelData, 1, &rms, vDSP_Length(frameLength))
-            levelCallback(rms)
+            // AVAudioEngine on macOS does NOT auto-track the system's default input device —
+            // the AUHAL remains bound to whatever device was current when the audio unit was
+            // first created. Explicitly bind it now so plugging in Bluetooth headphones or
+            // switching mics in System Settings is honored from the next recording onward.
+            let inputNode = self.engine.inputNode
+            if let deviceID = Self.currentDefaultInputDevice() {
+                let bindStatus = Self.setInputNodeDevice(inputNode, deviceID: deviceID)
+                if bindStatus != noErr {
+                    // Don't continue with installTap/start — the AUHAL is in an
+                    // inconsistent state and a subsequent engine.start() can hang
+                    // the audio HAL RPC indefinitely.
+                    owLog("[AudioEngine] Aborting start (device bind failed: \(bindStatus))")
+                    return
+                }
+                owLog("[AudioEngine] Bound input to device \(deviceID) (\(Self.deviceName(deviceID) ?? "unknown"))")
+            } else {
+                owLog("[AudioEngine] No default input device found — falling back to AVAudioEngine default")
+            }
 
-            // Accumulate mono samples (channel 0)
-            let channelSamples = Array(UnsafeBufferPointer(start: channelData, count: frameLength))
-            self.lock.lock()
-            self.samples.append(contentsOf: channelSamples)
-            self.lock.unlock()
-        }
+            let format = inputNode.outputFormat(forBus: 0)
+            self.inputSampleRate = format.sampleRate
+            owLog("[AudioEngine] Recording format: \(format.sampleRate)Hz, \(format.channelCount)ch")
 
-        do {
-            try engine.start()
-            owLog("[AudioEngine] Engine started")
-        } catch {
-            owLog("[AudioEngine] Failed to start: \(error)")
+            inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
+                guard let self else { return }
+                guard let channelData = buffer.floatChannelData?[0] else { return }
+                let frameLength = Int(buffer.frameLength)
+
+                var rms: Float = 0
+                vDSP_rmsqv(channelData, 1, &rms, vDSP_Length(frameLength))
+                levelCallback(rms)
+
+                let channelSamples = Array(UnsafeBufferPointer(start: channelData, count: frameLength))
+                self.lock.lock()
+                self.samples.append(contentsOf: channelSamples)
+                self.lock.unlock()
+            }
+
+            do {
+                owLog("[AudioEngine] start: engine.start()")
+                try self.engine.start()
+                owLog("[AudioEngine] Engine started")
+            } catch {
+                owLog("[AudioEngine] Failed to start: \(error)")
+            }
         }
     }
 
-    func stopRecording() -> [Float]? {
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+    /// Stop recording and deliver captured samples (resampled to 16kHz mono).
+    /// All HAL teardown happens on the dedicated audio queue so the caller
+    /// (typically the main thread) can never be blocked by AUHAL RPCs.
+    /// The completion always fires on the main thread.
+    func stopRecording(completion: @escaping ([Float]?) -> Void) {
+        audioQueue.async { [weak self] in
+            guard let self else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            owLog("[AudioEngine] stop: removing tap")
+            self.engine.inputNode.removeTap(onBus: 0)
+            owLog("[AudioEngine] stop: engine.stop()")
+            self.engine.stop()
+            owLog("[AudioEngine] stop: drained")
 
-        lock.lock()
-        let captured = samples
-        samples = []
-        lock.unlock()
+            self.lock.lock()
+            let captured = self.samples
+            self.samples = []
+            self.lock.unlock()
 
-        guard !captured.isEmpty else { return nil }
-
-        // Resample to 16kHz mono for WhisperKit
-        return resampleTo16kHz(captured, fromRate: inputSampleRate)
+            let resampled: [Float]?
+            if captured.isEmpty {
+                resampled = nil
+            } else {
+                resampled = self.resampleTo16kHz(captured, fromRate: self.inputSampleRate)
+            }
+            DispatchQueue.main.async { completion(resampled) }
+        }
     }
 
     // MARK: - Resampling
@@ -200,11 +234,13 @@ final class AudioEngine: @unchecked Sendable {
     }
 
     /// Bind the AUHAL audio unit behind `inputNode` to `deviceID`.
-    private static func setInputNodeDevice(_ inputNode: AVAudioInputNode, deviceID: AudioDeviceID) {
+    /// Returns the OSStatus so the caller can abort if the binding failed.
+    @discardableResult
+    private static func setInputNodeDevice(_ inputNode: AVAudioInputNode, deviceID: AudioDeviceID) -> OSStatus {
         let audioUnit = inputNode.audioUnit
         guard let unit = audioUnit else {
             owLog("[AudioEngine] inputNode has no audio unit — cannot bind device")
-            return
+            return OSStatus(kAudioUnitErr_Uninitialized)
         }
         var device = deviceID
         let status = AudioUnitSetProperty(
@@ -218,6 +254,7 @@ final class AudioEngine: @unchecked Sendable {
         if status != noErr {
             owLog("[AudioEngine] AudioUnitSetProperty(CurrentDevice) failed: \(status)")
         }
+        return status
     }
 
     // MARK: - Default input device change listener

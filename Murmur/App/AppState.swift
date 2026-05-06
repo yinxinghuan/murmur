@@ -219,6 +219,11 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         textInjector = TextInjector()
         flowBarController = FlowBarController(appState: self)
 
+        // Preload all system sounds we use, so the first hotkey press doesn't
+        // pay NSSound init latency (which historically caused the start cue
+        // to be inaudible).
+        preloadSounds(["Tink", "Pop", "Glass", "Basso", "Sosumi", "Funk"])
+
         // Clean up any incomplete model downloads from previous crashes
         transcriber?.cleanIncompleteDownloads()
 
@@ -471,18 +476,30 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         audioLevel = 0
         lastError = nil
 
-        // Mute system audio during recording to avoid picking up music/video
+        // Play start cue BEFORE muting — otherwise the cue is inaudible because
+        // we're about to drop the system output volume to 0. CoreAudio writes
+        // to the hardware volume are effectively instant, so the cue's audio
+        // buffer (still in flight to the speakers) gets clipped if we mute
+        // immediately. Defer the mute by ~280ms (longer than Tink's duration)
+        // so the cue plays at full volume.
+        playSound("Tink", volume: 0.8)
+
+        // Mute system audio during recording to avoid picking up music/video.
         if isSystemMediaPlaying() {
             savedSystemVolume = getSystemVolume()
-            setSystemVolume(0)
             didPauseSystemMedia = true
-            owLog("[Murmur] Muted system audio (was \(savedSystemVolume ?? 0))")
+            owLog("[Murmur] Will mute system audio (was \(savedSystemVolume ?? 0)) after start cue")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { [weak self] in
+                guard let self else { return }
+                // Only mute if we're still recording — the user might already
+                // have released the key in toggle mode.
+                guard self.recordingState == .recording, self.didPauseSystemMedia else { return }
+                self.setSystemVolume(0)
+            }
         } else {
             didPauseSystemMedia = false
             savedSystemVolume = nil
         }
-
-        playSound("Tink", volume: 0.3)
 
         // Show flow bar when recording starts
         if flowBarEnabled {
@@ -512,13 +529,25 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
     func stopRecording() {
         guard recordingState == .recording else { return }
         recordingState = .transcribing
-        playSound("Pop", volume: 0.2)
+        // Restore system volume BEFORE playing the stop cue — otherwise the cue
+        // is inaudible because the transcribe phase keeps the output muted
+        // until resumeSystemMedia() runs much later.
+        resumeSystemMedia()
+        playSound("Pop", volume: 0.8)
         owLog("[Murmur] Transcribing...")
 
         recordingTimer?.invalidate()
         recordingTimer = nil
 
-        guard let audioData = audioEngine?.stopRecording() else {
+        audioEngine?.stopRecording { [weak self] audioData in
+            Task { @MainActor in
+                self?.handleCapturedAudio(audioData)
+            }
+        }
+    }
+
+    private func handleCapturedAudio(_ audioData: [Float]?) {
+        guard let audioData else {
             owLog("[Murmur] No audio captured")
             recordingState = .idle
             hideFlowBarAfterDelay(0.3)
@@ -758,9 +787,9 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         guard recordingState != .idle else { return }
         owLog("[Murmur] Cancelled by user")
 
-        // Stop audio if still recording
+        // Stop audio if still recording — fire and forget, samples are discarded
         if recordingState == .recording {
-            let _ = audioEngine?.stopRecording()
+            audioEngine?.stopRecording { _ in }
         }
 
         // Cancel in-flight transcription
@@ -1065,8 +1094,29 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     // MARK: - Sound
 
+    // Cached NSSound instances. NSSound's first instantiation incurs disk +
+    // CoreAudio init latency that can be longer than the sound itself —
+    // recreating per-call caused the start cue to be eaten by the immediate
+    // setSystemVolume(0) that follows.
+    private var soundCache: [String: NSSound] = [:]
+
+    private func preloadSounds(_ names: [String]) {
+        for name in names where soundCache[name] == nil {
+            soundCache[name] = NSSound(named: NSSound.Name(name))
+        }
+    }
+
     private func playSound(_ name: String, volume: Float) {
-        guard let sound = NSSound(named: NSSound.Name(name)) else { return }
+        let sound: NSSound?
+        if let cached = soundCache[name] {
+            // NSSound can't be played concurrently with itself; reset position.
+            cached.stop()
+            sound = cached
+        } else {
+            sound = NSSound(named: NSSound.Name(name))
+            if let s = sound { soundCache[name] = s }
+        }
+        guard let sound else { return }
         sound.volume = volume
         sound.play()
     }
