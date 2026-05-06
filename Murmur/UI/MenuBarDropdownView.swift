@@ -41,6 +41,20 @@ struct MenuBarDropdownView: View {
                     .disabled(appState.translateToEnglish)
             }
 
+            if appState.language != "en" && appState.whisperModel != "small.en" {
+                HStack {
+                    Label {
+                        Text(zh ? "译为英文" : "Translate → EN")
+                    } icon: {
+                        BundledIcon(name: "translate", size: 15)
+                    }
+                    .labelStyle(SettingsLabelStyle())
+                    Spacer()
+                    Toggle("", isOn: $appState.translateToEnglish)
+                        .toggleStyle(.switch).labelsHidden().controlSize(.mini)
+                }
+            }
+
             // ── Recent Transcriptions ──
             if !appState.transcriptionHistory.isEmpty {
                 Divider()

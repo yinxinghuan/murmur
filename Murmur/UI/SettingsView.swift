@@ -67,7 +67,7 @@ struct SettingsView: View {
             modelStatus
 
             // Language
-            row(zh ? "输入语言" : "Language", icon: "globe") {
+            row(zh ? "输入语言" : "Language", icon: "voice_selection") {
                 Picker("", selection: $appState.language) {
                     Text(zh ? "自动检测" : "Auto").tag("")
                     Text("中文").tag("zh")
@@ -103,7 +103,7 @@ struct SettingsView: View {
 
             // Translation (before LLM — overrides polish)
             if appState.language != "en" && appState.whisperModel != "small.en" {
-                row(zh ? "翻译输出" : "Translate", icon: "character.bubble") {
+                row(zh ? "翻译输出" : "Translate", icon: "translate") {
                     Picker("", selection: $appState.translateToEnglish) {
                         Text(zh ? "原文" : "Off").tag(false)
                         Text(zh ? "译为英文" : "→ EN").tag(true)
@@ -339,7 +339,11 @@ struct SettingsView: View {
 
     private func row<Content: View>(_ label: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
         HStack {
-            Label(label, systemImage: icon)
+            Label {
+                Text(label)
+            } icon: {
+                BundledIcon(name: icon, size: 14)
+            }
             Spacer()
             content()
         }

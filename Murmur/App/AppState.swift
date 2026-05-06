@@ -625,6 +625,33 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
                         }
                     }
                 }
+
+                // Translate mode: same first-run / glitch protection.
+                // Failure modes: (1) empty/hallucination-filtered output, (2) Whisper
+                // returned source-language text instead of translating (mostly CJK).
+                // Retry once with explicit source language to nudge CoreML.
+                if translateToEnglish && language != "en" {
+                    let trimmedSoFar = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let chineseCount = trimmedSoFar.unicodeScalars.filter { $0.value >= 0x4E00 && $0.value <= 0x9FFF }.count
+                    let totalAlpha = trimmedSoFar.unicodeScalars.filter(\.properties.isAlphabetic).count
+                    let chineseRatio = totalAlpha > 0 ? Double(chineseCount) / Double(totalAlpha) : 0
+                    let didNotTranslate = chineseRatio >= 0.3
+                    let needsRetry = trimmedSoFar.isEmpty || didNotTranslate
+                    if needsRetry {
+                        let retryLang = language.isEmpty ? "zh" : language
+                        owLog("[Murmur] Translate failed (empty=\(trimmedSoFar.isEmpty), notTranslated=\(didNotTranslate), firstRun=\(!isFirstTranscriptionDone)), retrying with lang=\(retryLang)...")
+                        if !isFirstTranscriptionDone {
+                            try? await Task.sleep(nanoseconds: 800_000_000)
+                        }
+                        result = try await transcriber?.transcribe(
+                            audioData: audioData,
+                            language: retryLang,
+                            translateToEnglish: true
+                        )
+                        text = result?.text ?? ""
+                        owLog("[Murmur] Translate retry result: \(text)")
+                    }
+                }
                 isFirstTranscriptionDone = true
 
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -988,7 +1015,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     // MARK: - Update Check
 
-    static let currentVersion = "1.7.7"
+    static let currentVersion = "1.7.9"
 
     func checkForUpdate() async {
         guard let url = URL(string: "https://api.github.com/repos/yinxinghuan/murmur/releases/latest") else { return }

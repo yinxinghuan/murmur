@@ -60,7 +60,7 @@ struct GeneralSettingsTab: View {
                     }
                     modelStatus
 
-                    settingsRow(zh ? "输入语言" : "Input Language", icon: "globe") {
+                    settingsRow(zh ? "输入语言" : "Input Language", icon: "voice_selection") {
                         Picker("", selection: $appState.language) {
                             Text(zh ? "自动检测" : "Auto").tag("")
                             Text("中文").tag("zh")
@@ -109,7 +109,7 @@ struct GeneralSettingsTab: View {
                     }
 
                     if appState.language != "en" && appState.whisperModel != "small.en" {
-                        settingsRow(zh ? "翻译输出" : "Translate", icon: "character.bubble") {
+                        settingsRow(zh ? "翻译输出" : "Translate", icon: "translate") {
                             Picker("", selection: $appState.translateToEnglish) {
                                 Text(zh ? "原文" : "Off").tag(false)
                                 Text(zh ? "译为英文" : "→ EN").tag(true)
@@ -193,7 +193,7 @@ struct GeneralSettingsTab: View {
             Label {
                 Text(label).font(.system(size: 13))
             } icon: {
-                Image(systemName: icon)
+                BundledIcon(name: icon, size: 14)
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .frame(width: 20)
