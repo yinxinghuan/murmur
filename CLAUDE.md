@@ -4,7 +4,7 @@ Fork of [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app)，MIT �
 **核心定位：人与 AI 代理沟通的语音桥梁。**
 
 GitHub: https://github.com/yinxinghuan/murmur
-当前版本: v1.7.9
+当前版本: v1.7.10
 
 ## Tech Stack
 
@@ -112,7 +112,6 @@ Murmur/
 
 - [ ] iOS 版本（键盘扩展 / Shortcuts Action，WhisperKit on-device）
 - [ ] Apple Developer 签名（消除 Gatekeeper 弹窗）
-- [ ] 智能术语保护（对比 raw/cleaned 检测被错误修改的术语，建议用户添加）
 - [ ] 落地页（产品介绍页面）
 - [ ] Homebrew cask（可选，等用户量上来）
 
@@ -122,3 +121,4 @@ Murmur/
 - [x] 菜单栏状态反馈 → Toast 气泡通知（v1.7.0）
 - [x] 模型加载 UX 改进（v1.7.0）
 - [x] 白底 FlowBar 阴影裁剪
+- [x] 智能术语保护（v1.7.1，对比 raw/cleaned 检测被错误修改的术语，建议用户添加）

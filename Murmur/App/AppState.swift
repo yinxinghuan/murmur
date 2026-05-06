@@ -148,6 +148,14 @@ final class AppState {
     private var recordingTimer: Timer?
     private var targetApp: NSRunningApplication?
 
+    /// Watchdog timers for AUHAL hangs. If the AudioEngine doesn't report
+    /// start/stop completion within ~3s, we assume the audio HAL RPC is
+    /// stuck (see /tmp/murmur.log 2026-05-06 11:58:58 incident) and force a
+    /// recover() so the next press isn't blocked forever.
+    private var audioStartWatchdog: DispatchWorkItem?
+    private var audioStopWatchdog: DispatchWorkItem?
+    private static let audioWatchdogTimeout: TimeInterval = 3.0
+
     // MARK: - Computed
 
     var menuBarIcon: String {
@@ -290,6 +298,12 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         if ollamaAvailable {
             await refreshInstalledLLMModels()
             await pullLLMModelIfNeeded()
+            // Fire-and-forget prewarm so the first real polish doesn't pay
+            // the model cold-start cost.
+            if llmCleanupEnabled, let llm = llmCleanup {
+                let model = llmModel
+                Task.detached { await llm.prewarm(model: model) }
+            }
         }
 
         // Setup reminders
@@ -506,11 +520,22 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
             flowBarController?.show()
         }
 
-        audioEngine?.startRecording { [weak self] level in
-            Task { @MainActor in
-                self?.audioLevel = level
+        scheduleAudioStartWatchdog()
+        audioEngine?.startRecording(
+            levelCallback: { [weak self] level in
+                Task { @MainActor in
+                    self?.audioLevel = level
+                }
+            },
+            onResult: { [weak self] result in
+                guard let self else { return }
+                self.audioStartWatchdog?.cancel()
+                self.audioStartWatchdog = nil
+                if case let .failure(err) = result {
+                    self.handleAudioStartFailure(err)
+                }
             }
-        }
+        )
 
         // Start duration timer
         recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -539,11 +564,72 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         recordingTimer?.invalidate()
         recordingTimer = nil
 
+        scheduleAudioStopWatchdog()
         audioEngine?.stopRecording { [weak self] audioData in
             Task { @MainActor in
-                self?.handleCapturedAudio(audioData)
+                guard let self else { return }
+                self.audioStopWatchdog?.cancel()
+                self.audioStopWatchdog = nil
+                self.handleCapturedAudio(audioData)
             }
         }
+    }
+
+    // MARK: - Audio HAL Watchdog
+
+    private func scheduleAudioStartWatchdog() {
+        audioStartWatchdog?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                guard self.recordingState == .recording else { return }
+                owLog("[Murmur] Audio start watchdog fired — AUHAL appears hung, recovering")
+                self.audioEngine?.recover()
+                self.recordingState = .idle
+                self.resumeSystemMedia()
+                self.hideFlowBarAfterDelay(0.3)
+                self.showAudioStuckToast()
+            }
+        }
+        audioStartWatchdog = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.audioWatchdogTimeout, execute: item)
+    }
+
+    private func scheduleAudioStopWatchdog() {
+        audioStopWatchdog?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                guard self.recordingState == .transcribing else { return }
+                owLog("[Murmur] Audio stop watchdog fired — AUHAL appears hung, recovering")
+                self.audioEngine?.recover()
+                self.recordingState = .idle
+                self.hideFlowBarAfterDelay(0.3)
+                self.showAudioStuckToast()
+            }
+        }
+        audioStopWatchdog = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.audioWatchdogTimeout, execute: item)
+    }
+
+    private func handleAudioStartFailure(_ error: AudioEngine.StartError) {
+        owLog("[Murmur] Audio start failed: \(error)")
+        guard recordingState == .recording else { return }
+        recordingState = .idle
+        resumeSystemMedia()
+        hideFlowBarAfterDelay(0.3)
+        showAudioStuckToast()
+    }
+
+    private func showAudioStuckToast() {
+        let zh = uiLanguage == "zh"
+        ToastController.shared.show(
+            zh ? "音频设备无响应" : "Audio device unresponsive",
+            content: zh ? "已重置音频引擎，请重试。" : "Audio engine reset — please try again.",
+            icon: "exclamationmark.triangle.fill",
+            style: .warning,
+            duration: 4.0
+        )
     }
 
     private func handleCapturedAudio(_ audioData: [Float]?) {
@@ -814,6 +900,11 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
         guard recordingState != .idle else { return }
         owLog("[Murmur] Cancelled by user")
 
+        audioStartWatchdog?.cancel()
+        audioStartWatchdog = nil
+        audioStopWatchdog?.cancel()
+        audioStopWatchdog = nil
+
         // Stop audio if still recording — fire and forget, samples are discarded
         if recordingState == .recording {
             audioEngine?.stopRecording { _ in }
@@ -980,7 +1071,14 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
     }
 
     func refreshOllamaStatus() async {
+        let wasAvailable = ollamaAvailable
         ollamaAvailable = await LLMCleanup.checkAvailability()
+        // Re-prewarm when Ollama just came back online (e.g. user started it
+        // after Murmur launched, or LLM polish was toggled on).
+        if ollamaAvailable, !wasAvailable, llmCleanupEnabled, let llm = llmCleanup {
+            let model = llmModel
+            Task.detached { await llm.prewarm(model: model) }
+        }
     }
 
     func refreshDownloadedModels() {
@@ -1015,7 +1113,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     // MARK: - Update Check
 
-    static let currentVersion = "1.7.9"
+    static let currentVersion = "1.7.10"
 
     func checkForUpdate() async {
         guard let url = URL(string: "https://api.github.com/repos/yinxinghuan/murmur/releases/latest") else { return }

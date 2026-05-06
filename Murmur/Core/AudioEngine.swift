@@ -15,7 +15,12 @@ final class AudioEngine: @unchecked Sendable {
     // gets stuck on a dead device, the RPC can hang for tens of seconds and
     // freeze the global hotkey monitor along with it (see /tmp/murmur.log
     // 2026-05-05 22:38:26 incident).
-    private let audioQueue = DispatchQueue(label: "com.yinxinghuan.murmur.audio")
+    //
+    // The queue is `var` so `recover()` can replace it with a fresh queue
+    // when AUHAL hangs — the stuck task on the old queue is abandoned and
+    // GCD eventually reclaims it whenever the kernel RPC unblocks.
+    private var audioQueue = DispatchQueue(label: "com.yinxinghuan.murmur.audio")
+    private let queueLock = NSLock()
 
     init() {
         installDefaultInputDeviceListener()
@@ -36,13 +41,21 @@ final class AudioEngine: @unchecked Sendable {
         return false
     }
 
-    func startRecording(levelCallback: @escaping (Float) -> Void) {
+    /// Begin recording. `onResult` fires on the main thread:
+    /// `.success` when `engine.start()` returns OK, `.failure` if device bind
+    /// or engine start failed. The caller can use this to decide whether to
+    /// run a watchdog (see `recover()` for hung-AUHAL case).
+    func startRecording(
+        levelCallback: @escaping (Float) -> Void,
+        onResult: ((StartResult) -> Void)? = nil
+    ) {
         self.levelCallback = levelCallback
         lock.lock()
         samples = []
         lock.unlock()
 
-        audioQueue.async { [weak self] in
+        let queue = currentQueue()
+        queue.async { [weak self] in
             guard let self else { return }
             owLog("[AudioEngine] start: stopping previous engine")
             self.engine.stop()
@@ -63,6 +76,7 @@ final class AudioEngine: @unchecked Sendable {
                     // inconsistent state and a subsequent engine.start() can hang
                     // the audio HAL RPC indefinitely.
                     owLog("[AudioEngine] Aborting start (device bind failed: \(bindStatus))")
+                    DispatchQueue.main.async { onResult?(.failure(.deviceBindFailed(bindStatus))) }
                     return
                 }
                 owLog("[AudioEngine] Bound input to device \(deviceID) (\(Self.deviceName(deviceID) ?? "unknown"))")
@@ -93,10 +107,48 @@ final class AudioEngine: @unchecked Sendable {
                 owLog("[AudioEngine] start: engine.start()")
                 try self.engine.start()
                 owLog("[AudioEngine] Engine started")
+                DispatchQueue.main.async { onResult?(.success) }
             } catch {
                 owLog("[AudioEngine] Failed to start: \(error)")
+                DispatchQueue.main.async { onResult?(.failure(.engineStart(error))) }
             }
         }
+    }
+
+    enum StartResult {
+        case success
+        case failure(StartError)
+    }
+    enum StartError: Error {
+        case deviceBindFailed(OSStatus)
+        case engineStart(Error)
+    }
+
+    /// Abandon any pending HAL work on the audio queue (it may still be hung
+    /// inside a CoreAudio RPC) and start fresh. The previous queue is left
+    /// to drain on its own — when the stuck task eventually returns, GCD
+    /// will reclaim it. New recordings go through a brand-new queue and
+    /// AVAudioEngine instance.
+    func recover() {
+        owLog("[AudioEngine] recover(): abandoning stuck queue, building fresh engine")
+        queueLock.lock()
+        audioQueue = DispatchQueue(label: "com.yinxinghuan.murmur.audio.\(UUID().uuidString.prefix(8))")
+        queueLock.unlock()
+        // Replace the engine on the new queue so the next start doesn't try
+        // to stop()/reset() the (possibly hung) old instance.
+        let q = currentQueue()
+        q.async { [weak self] in
+            guard let self else { return }
+            self.engine = AVAudioEngine()
+            owLog("[AudioEngine] recover(): fresh engine ready")
+        }
+    }
+
+    private func currentQueue() -> DispatchQueue {
+        queueLock.lock()
+        let q = audioQueue
+        queueLock.unlock()
+        return q
     }
 
     /// Stop recording and deliver captured samples (resampled to 16kHz mono).
@@ -104,7 +156,8 @@ final class AudioEngine: @unchecked Sendable {
     /// (typically the main thread) can never be blocked by AUHAL RPCs.
     /// The completion always fires on the main thread.
     func stopRecording(completion: @escaping ([Float]?) -> Void) {
-        audioQueue.async { [weak self] in
+        let queue = currentQueue()
+        queue.async { [weak self] in
             guard let self else {
                 DispatchQueue.main.async { completion(nil) }
                 return

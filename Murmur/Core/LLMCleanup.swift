@@ -117,6 +117,34 @@ final class LLMCleanup: Sendable {
         }
     }
 
+    /// Warm Ollama by issuing a tiny generate request so the model is held
+    /// in memory before the user's first real polish call. Saves the
+    /// cold-start cost (model load + KV cache init), which can be several
+    /// seconds for the larger LLMs.
+    func prewarm(model: String) async {
+        guard let url = URL(string: "\(baseURL)/api/generate") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 60
+        let body: [String: Any] = [
+            "model": model,
+            "prompt": " ",
+            "stream": false,
+            "keep_alive": "30m",
+            "options": ["num_predict": 1, "temperature": 0]
+        ]
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let started = Date()
+            let (_, response) = try await URLSession.shared.data(for: request)
+            let ok = (response as? HTTPURLResponse)?.statusCode == 200
+            owLog("[LLM] Prewarm \(model): \(ok ? "ok" : "fail") in \(String(format: "%.1f", Date().timeIntervalSince(started)))s")
+        } catch {
+            owLog("[LLM] Prewarm \(model) error: \(error.localizedDescription)")
+        }
+    }
+
     /// Clean up transcribed text using local Ollama LLM
     /// Max output length multiplier per style.
     /// Natural should never add content; concise/structured may reformat.

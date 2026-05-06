@@ -170,7 +170,7 @@ final class WhisperTranscriber: @unchecked Sendable {
             task: task,
             language: language.isEmpty ? nil : language,
             temperature: 0.0,
-            temperatureFallbackCount: 3,
+            temperatureFallbackCount: 1,
             sampleLength: 224,
             suppressBlank: true,
             supressTokens: nil,
