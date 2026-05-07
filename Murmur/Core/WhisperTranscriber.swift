@@ -128,6 +128,13 @@ final class WhisperTranscriber: @unchecked Sendable {
             owLog("[Whisper] Download complete at: \(modelFolder.path)")
         }
 
+        // Make sure tokenizer files live next to the .mlmodelc folders. WhisperKit's
+        // tokenizer loader searches `modelFolder` first via additionalSearchPaths, so
+        // putting tokenizer.json there means startup never has to talk to HuggingFace
+        // (no etag check, no snapshot call). Best-effort: a network failure here is
+        // not fatal — WhisperKit can still fall back to ~/Documents/huggingface or Hub.
+        await Self.ensureTokenizerFiles(in: modelFolder)
+
         // Compile CoreML model — can take 30-90s for large models
         phase(.compile)
         progress(0)
@@ -136,10 +143,13 @@ final class WhisperTranscriber: @unchecked Sendable {
         let progressTimer = ProgressTimer(from: 0.0, to: 0.95, duration: 60, callback: progress)
         progressTimer.start()
 
+        // prewarm: false — prewarming runs CoreML once during init and adds 1-2s of
+        // network-adjacent work to the startup path. We'd rather pay that on the first
+        // hotkey press than block app launch on it.
         whisperKit = try await WhisperKit(
             modelFolder: modelFolder.path,
             verbose: false,
-            prewarm: true,
+            prewarm: false,
             load: true,
             download: false
         )
@@ -276,6 +286,66 @@ final class WhisperTranscriber: @unchecked Sendable {
         if cleaned.isEmpty { return empty }
 
         return TranscribeResult(text: cleaned, detectedLanguage: detectedLang)
+    }
+
+    /// Tokenizer files WhisperKit's loader looks for. Placing these inside the model
+    /// folder lets `additionalSearchPaths = [modelFolder]` short-circuit the loader's
+    /// HF Hub lookup, so nothing in the startup path needs the network.
+    private static let tokenizerFiles = ["tokenizer.json", "tokenizer_config.json"]
+
+    /// Reads the model's `config.json` to discover which HF tokenizer repo to fetch
+    /// (e.g. all `large-v3*` variants share `openai/whisper-large-v3`).
+    private static func tokenizerRepo(from modelFolder: URL) -> String? {
+        let configURL = modelFolder.appendingPathComponent("config.json")
+        guard let data = try? Data(contentsOf: configURL),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let repo = json["_name_or_path"] as? String, !repo.isEmpty
+        else { return nil }
+        return repo
+    }
+
+    /// Make sure the tokenizer files exist directly inside `modelFolder`. We try (in
+    /// order): files already present → copy from `~/Documents/huggingface/...` →
+    /// download from HuggingFace with a tight timeout. Network failures are non-fatal
+    /// because WhisperKit retains its own Hub fallback at load time.
+    static func ensureTokenizerFiles(in modelFolder: URL) async {
+        let needed = tokenizerFiles.filter {
+            !FileManager.default.fileExists(atPath: modelFolder.appendingPathComponent($0).path)
+        }
+        guard !needed.isEmpty else { return }
+        guard let repo = tokenizerRepo(from: modelFolder) else {
+            owLog("[Whisper] tokenizer repo unknown (no _name_or_path in config.json), skipping prefetch")
+            return
+        }
+
+        let docsCache = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("huggingface/models/\(repo)")
+
+        for file in needed {
+            let dst = modelFolder.appendingPathComponent(file)
+            let cached = docsCache.appendingPathComponent(file)
+            if FileManager.default.fileExists(atPath: cached.path) {
+                if (try? FileManager.default.copyItem(at: cached, to: dst)) != nil {
+                    owLog("[Whisper] Copied tokenizer file from local cache: \(file)")
+                    continue
+                }
+            }
+
+            guard let url = URL(string: "https://huggingface.co/\(repo)/resolve/main/\(file)") else { continue }
+            var req = URLRequest(url: url)
+            req.timeoutInterval = 20
+            do {
+                let (data, response) = try await URLSession.shared.data(for: req)
+                guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                    owLog("[Whisper] Tokenizer prefetch HTTP error for \(file)")
+                    continue
+                }
+                try data.write(to: dst, options: .atomic)
+                owLog("[Whisper] Downloaded tokenizer file: \(file) (\(data.count) bytes)")
+            } catch {
+                owLog("[Whisper] Tokenizer prefetch failed for \(file): \(error.localizedDescription)")
+            }
+        }
     }
 
     /// Keep only the 2 most recent models on disk

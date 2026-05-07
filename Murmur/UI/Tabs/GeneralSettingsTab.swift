@@ -243,11 +243,18 @@ struct GeneralSettingsTab: View {
         } else if let failed = appState.failedModelName {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange).font(.system(size: 11))
-                Text(zh ? "\(failed) 下载不完整" : "\(failed) incomplete")
+                Text(appState.failedModelIntact
+                    ? (zh ? "\(failed) 加载失败（网络）" : "\(failed) load failed (network)")
+                    : (zh ? "\(failed) 下载不完整" : "\(failed) incomplete"))
                     .font(.system(size: 12)).foregroundStyle(.secondary)
                 Spacer()
-                Button(zh ? "重新下载" : "Re-download") { appState.retryModelDownload() }
-                    .buttonStyle(.borderedProminent).controlSize(.small)
+                if appState.failedModelIntact {
+                    Button(zh ? "重试" : "Retry") { appState.retryModelLoad() }
+                        .buttonStyle(.borderedProminent).controlSize(.small)
+                } else {
+                    Button(zh ? "重新下载" : "Re-download") { appState.retryModelDownload() }
+                        .buttonStyle(.borderedProminent).controlSize(.small)
+                }
             }
             .padding(.vertical, 4)
             .padding(.leading, 28)

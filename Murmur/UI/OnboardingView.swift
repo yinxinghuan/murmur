@@ -454,10 +454,18 @@ struct OnboardingView: View {
         } else if let failed = appState.failedModelName {
             HStack(spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.system(size: 14))
-                Text(zh ? "\(failed) 没有下完整，再试一次？" : "\(failed) didn't finish — try again?")
+                Text(appState.failedModelIntact
+                    ? (zh ? "\(failed) 加载失败，请检查网络" : "\(failed) failed to load — check network")
+                    : (zh ? "\(failed) 没有下完整，再试一次？" : "\(failed) didn't finish — try again?"))
                     .font(.system(size: 13)).foregroundStyle(.secondary)
                 Spacer()
-                Button(zh ? "重试" : "Retry") { appState.retryModelDownload() }
+                Button(zh ? "重试" : "Retry") {
+                    if appState.failedModelIntact {
+                        appState.retryModelLoad()
+                    } else {
+                        appState.retryModelDownload()
+                    }
+                }
                     .buttonStyle(.borderedProminent).controlSize(.small)
             }
             .padding(14)

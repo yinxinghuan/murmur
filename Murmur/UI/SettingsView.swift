@@ -363,12 +363,19 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange).font(.system(size: 11))
-                    Text(zh ? "\(failed) 下载不完整" : "\(failed) incomplete")
+                    Text(appState.failedModelIntact
+                        ? (zh ? "\(failed) 加载失败（网络）" : "\(failed) load failed (network)")
+                        : (zh ? "\(failed) 下载不完整" : "\(failed) incomplete"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 HStack(spacing: 8) {
-                    Button(zh ? "重新下载" : "Re-download") { appState.retryModelDownload() }
-                        .buttonStyle(.borderedProminent).controlSize(.small)
+                    if appState.failedModelIntact {
+                        Button(zh ? "重试" : "Retry") { appState.retryModelLoad() }
+                            .buttonStyle(.borderedProminent).controlSize(.small)
+                    } else {
+                        Button(zh ? "重新下载" : "Re-download") { appState.retryModelDownload() }
+                            .buttonStyle(.borderedProminent).controlSize(.small)
+                    }
                     if appState.findFallbackModel() != nil {
                         Button(zh ? "使用其他模型" : "Use another") {
                             if let fb = appState.findFallbackModel() {

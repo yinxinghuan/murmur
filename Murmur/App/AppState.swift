@@ -326,6 +326,10 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
     private let modelFallbackOrder = ["large-v3_turbo", "large-v3", "small", "base", "tiny"]
 
     var failedModelName: String?  // Non-nil when a model failed and needs user action
+    /// True when load failed but local model files are still complete (e.g. network/timeout
+    /// fetching tokenizer or transient WhisperKit init error). UI should offer "Retry" instead
+    /// of "Re-download", and the retry path must NOT delete the local model.
+    var failedModelIntact: Bool = false
 
     func loadModel() async {
         // Cancel any in-progress model load/download
@@ -389,15 +393,26 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
                 owLog("[Murmur] Model load failed: \(error)")
                 modelLoading = false
 
-                // Delete the broken model
-                transcriber?.deleteModel(name: targetModel)
+                // Only delete the model if files are actually missing/corrupted.
+                // WhisperKit can also throw on transient network errors while fetching
+                // tokenizer/config from HuggingFace during init — in that case the local
+                // .mlmodelc files are intact and re-downloading wastes 10+ minutes.
+                let stillIntact = transcriber?.isModelDownloaded(name: targetModel) ?? false
+                if !stillIntact {
+                    transcriber?.deleteModel(name: targetModel)
+                }
                 refreshDownloadedModels()
 
                 // Don't auto-fallback — let user decide
                 failedModelName = targetModel
+                failedModelIntact = stillIntact
                 lastError = uiLanguage == "zh"
-                    ? "\(targetModel) 下载不完整或已损坏"
-                    : "\(targetModel) is incomplete or corrupted"
+                    ? (stillIntact
+                        ? "\(targetModel) 加载失败（请检查网络后重试）"
+                        : "\(targetModel) 下载不完整或已损坏")
+                    : (stillIntact
+                        ? "\(targetModel) failed to load (check network and retry)"
+                        : "\(targetModel) is incomplete or corrupted")
             }
         }
         modelLoadTask = task
@@ -435,7 +450,15 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
     func retryModelDownload() {
         transcriber?.deleteModel(name: whisperModel)
         lastError = nil
+        failedModelIntact = false
         refreshDownloadedModels()
+        Task { await loadModel() }
+    }
+
+    /// Retry without deleting: for failures where local files are still complete
+    /// (typically network/timeout fetching tokenizer during WhisperKit init).
+    func retryModelLoad() {
+        lastError = nil
         Task { await loadModel() }
     }
 
@@ -1113,7 +1136,7 @@ dictationMode = defaults.string(forKey: "dictationMode") ?? "hold"
 
     // MARK: - Update Check
 
-    static let currentVersion = "1.7.10"
+    static let currentVersion = "1.7.11"
 
     func checkForUpdate() async {
         guard let url = URL(string: "https://api.github.com/repos/yinxinghuan/murmur/releases/latest") else { return }
