@@ -180,13 +180,13 @@ final class WhisperTranscriber: @unchecked Sendable {
             task: task,
             language: language.isEmpty ? nil : language,
             temperature: 0.0,
-            temperatureFallbackCount: 1,
+            temperatureFallbackCount: 5,
             sampleLength: 224,
             suppressBlank: true,
             supressTokens: nil,
             compressionRatioThreshold: 2.4,
             logProbThreshold: -1.0,
-            noSpeechThreshold: 0.8
+            noSpeechThreshold: 0.6
         )
 
         let results = try await whisperKit.transcribe(
