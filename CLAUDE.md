@@ -4,7 +4,7 @@ Fork of [OpenWhisper](https://github.com/Rajvardhman05/openwhisper-app)，MIT �
 **核心定位：人与 AI 代理沟通的语音桥梁。**
 
 GitHub: https://github.com/yinxinghuan/murmur
-当前版本: v1.7.12
+当前版本: v1.7.13
 
 ## Tech Stack
 

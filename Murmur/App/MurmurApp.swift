@@ -94,10 +94,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
 
-        // Help items in app menu
+        // Resource links in app menu.
+        // Note: avoid the word "Help" in the title — on macOS 26 (Tahoe) any
+        // menu item whose title contains "Help" is auto-routed to the system
+        // `showHelp:` selector regardless of explicit target/action, which
+        // surfaces the "Help isn't available for Murmur" Help Viewer dialog
+        // instead of opening our GitHub README.
         appMenu.addItem(NSMenuItem.separator())
         let helpItem = NSMenuItem(
-            title: "Murmur Help",
+            title: "View on GitHub",
             action: #selector(openHelp),
             keyEquivalent: ""
         )
